@@ -34,4 +34,4 @@ jobs:
         PROJECT_FILE_PATH: Ac682.Hyperai.Clients.Mirai/Ac682.Hyperai.Clients.Mirai.csproj
         # API key to authenticate with NuGet server
         NUGET_KEY: ${{ secrets.PACKAGE_PUSH }}
-        INCLUDE_SYMBILS: true
+        INCLUDE_SYMBOLS: true
