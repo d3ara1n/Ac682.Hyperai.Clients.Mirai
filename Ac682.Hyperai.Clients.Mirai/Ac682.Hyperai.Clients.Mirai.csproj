@@ -12,13 +12,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Hyperai.Abstractions" Version="1.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="5.0.0-preview.5.20278.1" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="5.0.0-preview.5.20278.1" />
     <PackageReference Include="Mirai-CSharp" Version="1.0.1.4" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\Hyperai.Abstractions\Hyperai.Abstractions\Hyperai.Abstractions.csproj" />
-  </ItemGroup>
 
 </Project>
