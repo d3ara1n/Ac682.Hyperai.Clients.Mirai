@@ -2,9 +2,17 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <PackageId>Ac682.Hyperai.Clients.Mirai</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>ac682</Authors>
+    <Company>Unicore</Company>
+    <PackageDescription>Wrapping Mirai_CSharp</PackageDescription>
+    <RepositoryUrl>https://github.com/ac682/ac682.Hyperai.Clients.Mirai</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="5.0.0-preview.5.20278.1" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="5.0.0-preview.5.20278.1" />
     <PackageReference Include="Mirai-CSharp" Version="1.0.1.4" />
   </ItemGroup>

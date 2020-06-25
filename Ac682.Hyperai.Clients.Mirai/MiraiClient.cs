@@ -7,6 +7,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using System.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace Ac682.Hyperai.Clients.Mirai
 {
@@ -19,18 +22,24 @@ namespace Ac682.Hyperai.Clients.Mirai
         private MiraiHttpSession session;
 
         private readonly MiraiClientOptions _options;
+        private readonly ILogger<MiraiClient> _logger;
 
-        public MiraiClient(MiraiClientOptions options)
+        public MiraiClient(MiraiClientOptions options, ILogger<MiraiClient> logger)
         {
             _options = options;
+            _logger = logger;
         }
 
         public void Connect()
         {
+            State = ApiClientConnectionState.Connecting;
+            _logger.LogInformation("Connecting to {0}:{1}", _options.Host, _options.Port);
             var sessionOptions = new Model.MiraiHttpSessionOptions(_options.Host, _options.Port, _options.AuthKey);
             session = new MiraiHttpSession();
-            session.ConnectAsync(sessionOptions, _options.SelfQQ).Wait();
+            session.ConnectAsync(sessionOptions, _options.SelfQQ);
             session.FriendMessageEvt += Session_FriendMessageEvtAsync;
+            State = ApiClientConnectionState.Connected;
+            _logger.LogInformation("Connected.");
         }
 
         private async Task<bool> Session_FriendMessageEvtAsync(MiraiHttpSession sender, Model.IFriendMessageEventArgs e)
@@ -49,13 +58,13 @@ namespace Ac682.Hyperai.Clients.Mirai
         {
             foreach (var handler in handlers.Where(x => x.Item1.IsAssignableFrom(typeof(T))).Select(x => x.Item2))
             {
-                handler.GetType().GetMethod("Handler").Invoke(handler, new object[] { args });
+                handler.GetType().GetMethod("Handle").Invoke(handler, new object[] { args });
             }
         }
 
         public void Disconnect()
         {
-            throw new NotImplementedException();
+            Dispose();
         }
 
         public void Dispose()
@@ -70,14 +79,17 @@ namespace Ac682.Hyperai.Clients.Mirai
             if(!isDisposed && isDisposing)
             {
                 isDisposing = true;
-
+                State = ApiClientConnectionState.Disconnected;
                 session?.DisposeAsync().GetAwaiter().GetResult();
             }
         }
 
+        bool goDie = false;
+
         public void Listen()
         {
-            throw new NotImplementedException();
+            while (!goDie) Thread.Sleep(100);
+            Disconnect();
         }
 
         public void On<TEventArgs>(IEventHandler<TEventArgs> handler) where TEventArgs : GenericEventArgs
@@ -85,26 +97,41 @@ namespace Ac682.Hyperai.Clients.Mirai
             handlers.Add((typeof(TEventArgs), handler));
         }
 
+        [Obsolete]
         public IQueryable<T> Query<T>(Func<T, bool> cond) where T : class, new()
         {
             throw new NotImplementedException();
         }
 
-        public T Request<T>() where T : RelationModel
+        public async Task<T> RequestAsync<T>(T id) where T : RelationModel
         {
-            throw new NotImplementedException();
+            if(typeof(T) == typeof(Friend))
+            {
+                return (T)Convert.ChangeType((await session.GetFriendListAsync()).Where(x=>x.Id == id.Identity).FirstOrDefault()?.ToFriend(), typeof(T));
+            }
+
+            return null;
         }
 
+        [Obsolete]
         public string RequestRaw(string resource)
         {
             throw new NotImplementedException();
         }
 
-        public void Send<TEventArgs>(TEventArgs args) where TEventArgs : MessageEventArgs
+        public async Task SendAsync<TEventArgs>(TEventArgs args) where TEventArgs : MessageEventArgs
         {
-            throw new NotImplementedException();
+            switch(args)
+            {
+                case FriendMessageEventArgs friendMessage:
+                    await session.SendFriendMessageAsync(friendMessage.User.Identity, friendMessage.Message.ToMessageBases().ToArray());
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
         }
 
+        [Obsolete]
         public void SendRaw(string resource)
         {
             throw new NotImplementedException();

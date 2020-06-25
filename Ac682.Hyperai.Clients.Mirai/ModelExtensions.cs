@@ -47,6 +47,8 @@ namespace Ac682.Hyperai.Clients.Mirai
                         return new Unknown(um.Data.GetRawText());
                     case ImageMessage im:
                         return new RemoteImage(im.ImageId, im.Url);
+                    case FlashImageMessage fim:
+                        return new RemoteFlash(fim.Url);
 
                     default:
                         throw new NotImplementedException();
@@ -55,6 +57,38 @@ namespace Ac682.Hyperai.Clients.Mirai
 
             return chain;
         }
+
+        public static IEnumerable<IMessageBase> ToMessageBases(this MessageChain chain)
+        {
+            var bases = new List<IMessageBase>();
+            foreach(var comp in chain)
+            {
+                bases.Add((IMessageBase)(
+                    comp switch
+                    {
+                        Source source => new SourceMessage(source.MessageId, DateTime.Now),
+                        Plain plain => new PlainMessage(plain.Text),
+                        Quote quote => new QuoteMessage(quote.MessageId, 0,0,0,null),
+                        At at=> new AtMessage(at.TargetId, at.TargetId.ToString()),
+                        AtAll atAll=>new AtAllMessage(),
+                        Face face => new FaceMessage(face.FaceId, face.FaceId.ToString()),
+                        XmlContent xml => new XmlMessage(xml.Content),
+                        JsonContent json => new JsonMessage(json.Content),
+                        AppContent app => new AppMessage(app.Content),
+                        Poke poke => new PokeMessage((PokeMessage.PokeType)Enum.Parse(typeof(PokeMessage.PokeType), poke.Name.ToString())),
+                        Unknown unknown => new UnknownMessage(),
+                        RemoteImage image => new ImageMessage(image.ImageId, image.Url, null),
+                        LocalImage image => new ImageMessage(image.ImageId,null,image.FilePath),
+                        RemoteFlash flash => new FlashImageMessage(flash.ImageId, flash.Url, null),
+                        LocalFlash flash => new FlashImageMessage(flash.ImageId, null, flash.FilePath),
+
+                        _ => throw new NotImplementedException()
+                    }
+                    ));
+            }
+            return bases;
+        }
+
         public static Friend ToFriend(this IFriendInfo info)
         {
             var friend = new Friend()
