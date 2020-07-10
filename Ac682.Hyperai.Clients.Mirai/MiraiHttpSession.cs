@@ -21,8 +21,8 @@ namespace Ac682.Hyperai.Clients.Mirai
 
 
         private readonly HttpClient _client;
-        private readonly JsonFormatter _formatter;
-        private readonly JsonParser _parser;
+        private readonly JsonFormatter _formatter = new JsonFormatter();
+        private readonly JsonParser _parser = new JsonParser();
         private string sessionKey = null;
 
         public MiraiHttpSession(string host, int port, string authKey, long selfQQ)
