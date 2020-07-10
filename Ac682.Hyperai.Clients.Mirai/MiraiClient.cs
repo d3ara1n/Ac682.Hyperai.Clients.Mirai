@@ -1,8 +1,6 @@
 ﻿using Hyperai.Events;
 using Hyperai.Relations;
 using Hyperai.Services;
-using Mirai_CSharp;
-using Model = Mirai_CSharp.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,11 +13,11 @@ namespace Ac682.Hyperai.Clients.Mirai
 {
     public class MiraiClient : IApiClient
     {
-        public ApiClientConnectionState State { get; private set; }
+        public ApiClientConnectionState State => _session.State;
 
         List<(Type, object)> handlers = new List<(Type, object)>();
 
-        private MiraiHttpSession session;
+        private readonly MiraiHttpSession _session;
 
         private readonly MiraiClientOptions _options;
         private readonly ILogger<MiraiClient> _logger;
@@ -28,30 +26,15 @@ namespace Ac682.Hyperai.Clients.Mirai
         {
             _options = options;
             _logger = logger;
+
+            _session = new MiraiHttpSession(options.Host, options.Port, options.AuthKey, options.SelfQQ);
         }
 
         public void Connect()
         {
-            State = ApiClientConnectionState.Connecting;
             _logger.LogInformation("Connecting to {0}:{1}", _options.Host, _options.Port);
-            var sessionOptions = new Model.MiraiHttpSessionOptions(_options.Host, _options.Port, _options.AuthKey);
-            session = new MiraiHttpSession();
-            session.ConnectAsync(sessionOptions, _options.SelfQQ);
-            session.FriendMessageEvt += Session_FriendMessageEvtAsync;
-            State = ApiClientConnectionState.Connected;
+            _session.Connect();
             _logger.LogInformation("Connected.");
-        }
-
-        private async Task<bool> Session_FriendMessageEvtAsync(MiraiHttpSession sender, Model.IFriendMessageEventArgs e)
-        {
-            var args = new FriendMessageEventArgs()
-            {
-                User = e.Sender.ToFriend(),
-                Time = DateTime.Now,
-                Message = e.Chain.ToMessageChain()
-            };
-            InvokeHandler(args);
-            return true;
         }
 
         private void InvokeHandler<T>(T args) where T : GenericEventArgs
@@ -62,9 +45,17 @@ namespace Ac682.Hyperai.Clients.Mirai
             }
         }
 
+        private void InvokeHandler(GenericEventArgs args)
+        {
+            foreach (var handler in handlers.Where(x => x.Item1.IsAssignableFrom(args.GetType())).Select(x => x.Item2))
+            {
+                handler.GetType().GetMethod("Handle").Invoke(handler, new object[] { args });
+            }
+        }
+
         public void Disconnect()
         {
-            Dispose();
+            _session.Disconnect();
         }
 
         public void Dispose()
@@ -76,19 +67,23 @@ namespace Ac682.Hyperai.Clients.Mirai
         bool isDisposed = false;
         protected virtual void Dispose(bool isDisposing)
         {
-            if(!isDisposed && isDisposing)
+            if (!isDisposed && isDisposing)
             {
                 isDisposing = true;
-                State = ApiClientConnectionState.Disconnected;
-                session?.DisposeAsync().GetAwaiter().GetResult();
+                _session.Dispose();
             }
         }
 
-        bool goDie = false;
-
         public void Listen()
         {
-            while (!goDie) Thread.Sleep(100);
+            while (State == ApiClientConnectionState.Connected)
+            {
+                var evt = _session.PullEvent();
+                if (evt != null)
+                {
+                    InvokeHandler(evt);
+                }
+            }
             Disconnect();
         }
 
@@ -103,36 +98,40 @@ namespace Ac682.Hyperai.Clients.Mirai
             throw new NotImplementedException();
         }
 
-        public async Task<T> RequestAsync<T>(T id) where T : RelationModel
+        async Task<T> IApiClient.RequestAsync<T>(T id)
         {
-            if(typeof(T) == typeof(Friend))
+            if (typeof(T) == typeof(Friend))
             {
-                return (T)Convert.ChangeType((await session.GetFriendListAsync()).Where(x=>x.Id == id.Identity).FirstOrDefault()?.ToFriend(), typeof(T));
+                return (T)Convert.ChangeType((await _session.GetFriendsAsync()).Where(x => x.Identity == ((Friend)Convert.ChangeType(id, typeof(Friend))).Identity).FirstOrDefault(), typeof(T));
             }
-
-            return null;
-        }
-
-        [Obsolete]
-        public string RequestRaw(string resource)
-        {
-            throw new NotImplementedException();
+            else if (typeof(T) == typeof(Group))
+            {
+                return (T)Convert.ChangeType((await _session.GetGroupsAsync()).Where(x => x.Identity == ((Group)Convert.ChangeType(id, typeof(Group))).Identity).FirstOrDefault(), typeof(T));
+            }
+            return default(T);
         }
 
         public async Task SendAsync<TEventArgs>(TEventArgs args) where TEventArgs : MessageEventArgs
         {
-            switch(args)
+            switch (args)
             {
                 case FriendMessageEventArgs friendMessage:
-                    await session.SendFriendMessageAsync(friendMessage.User.Identity, friendMessage.Message.ToMessageBases().ToArray());
+                    await _session.SendFriendMessageAsync(friendMessage.User, friendMessage.Message);
+                    break;
+                case GroupMessageEventArgs groupMessage:
+                    await _session.SendGroupMessageAsync(groupMessage.Group, groupMessage.Message);
                     break;
                 default:
                     throw new NotImplementedException();
             }
         }
 
-        [Obsolete]
-        public void SendRaw(string resource)
+        public string RequestRawAsync(string resource)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void SendRawAsync(string resource)
         {
             throw new NotImplementedException();
         }
