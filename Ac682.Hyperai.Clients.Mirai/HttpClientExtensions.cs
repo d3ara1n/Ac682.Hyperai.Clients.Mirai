@@ -4,6 +4,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Ac682.Hyperai.Clients.Mirai
 {
@@ -29,7 +30,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                 using var stream = response.GetResponseStream();
                 using var reader = new StreamReader(stream, Encoding.UTF8);
                 var json = await reader.ReadToEndAsync();
-                return JsonConvert.DeserializeObject(json);
+                return JObject.Parse(json);
             }catch(Exception e)
             {
                 throw e;

@@ -19,7 +19,7 @@ namespace Ac682.Hyperai.Clients.Mirai
 
         public async Task<WebResponse> GetAsync(string action)
         {
-            var req = WebRequest.CreateHttp($"{BaseUrl}/{action}");
+            var req = WebRequest.CreateHttp($"http://{BaseUrl}/{action}");
             req.Method = "GET";
             req.UserAgent = UserAgent;
             return await req.GetResponseAsync();
@@ -27,7 +27,7 @@ namespace Ac682.Hyperai.Clients.Mirai
 
         public async Task<WebResponse> PostAsync(string action, object body)
         {
-            var req = WebRequest.CreateHttp($"{BaseUrl}/{action}");
+            var req = WebRequest.CreateHttp($"http://{BaseUrl}/{action}");
             req.Method = "POST";
             req.UserAgent = UserAgent;
             var content = JsonConvert.SerializeObject(body);

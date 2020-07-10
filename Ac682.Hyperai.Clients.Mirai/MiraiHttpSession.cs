@@ -37,11 +37,6 @@ namespace Ac682.Hyperai.Clients.Mirai
 
         public GenericEventArgs PullEvent()
         {
-            // $"fetchLatestMessage?sessionKey={sessionKey}&count=1".MakeRequest()
-            // .Get(_client)
-            // .IfErrorThenThrow()
-            // .HandleData();
-
             var fetch = _client.GetAsync($"fetchLatestMessage?sessionKey={sessionKey}&count=1").GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
             foreach (var evt in fetch.data)
             {
@@ -84,18 +79,14 @@ namespace Ac682.Hyperai.Clients.Mirai
         {
 
             var auth = _client.PostAsync("auth", new { authKey = _authKey }).GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
-            sessionKey = auth.session;
+            sessionKey = auth.session.Value;
             if (auth.code == -1)
             {
                 throw new ArgumentException("Wrong MIRAI API HTTP auth key");
             }
 
             var verify = _client.PostAsync("verify", new { sessionKey = this.sessionKey, qq = _selfQQ }).GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
-            var code = (ErrorCode)Enum.ToObject(typeof(ErrorCode), verify.code);
-            if (code != ErrorCode.Normal)
-            {
-                throw new ArgumentException(Enum.GetName(typeof(ErrorCode), code));
-            }
+            if(verify.code != 0) throw new ArgumentException(verify.msg);
 
             State = ApiClientConnectionState.Connected;
         }
@@ -125,7 +116,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                 list.Add(new Group()
                 {
                     Identity = group.id,
-                    Name = group.name,
+                    Name = group.name
                 });
             }
             return list;
