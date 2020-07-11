@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Ac682.Hyperai.Clients.Mirai
+﻿namespace Ac682.Hyperai.Clients.Mirai
 {
     public class MiraiClientOptions
     {

@@ -1,13 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Ac682.Hyperai.Clients.Mirai.DtObjects;
 using Ac682.Hyperai.Clients.Mirai.Serialization;
 using Hyperai.Events;
 using Hyperai.Messages;
 using Hyperai.Relations;
 using Hyperai.Services;
-using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Ac682.Hyperai.Clients.Mirai
 {
@@ -20,7 +19,7 @@ namespace Ac682.Hyperai.Clients.Mirai
         private readonly long _selfQQ;
 
 
-        private readonly HttpClient _client;
+        private readonly ApiHttpClient _client;
         private readonly JsonFormatter _formatter = new JsonFormatter();
         private readonly JsonParser _parser = new JsonParser();
         private string sessionKey = null;
@@ -32,44 +31,53 @@ namespace Ac682.Hyperai.Clients.Mirai
             _authKey = authKey;
             _selfQQ = selfQQ;
 
-            _client = new HttpClient($"{host}:{port}");
+            _client = new ApiHttpClient($"http://{host}:{port}");
         }
 
         public GenericEventArgs PullEvent()
         {
             var fetch = _client.GetAsync($"fetchLatestMessage?sessionKey={sessionKey}&count=1").GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
-            foreach (var evt in fetch.data)
+            foreach (var evt in fetch.Value<JArray>("data"))
             {
-                switch (evt.type)
+                switch (evt.Value<string>("type"))
                 {
                     case "FriendMessage":
                         return new FriendMessageEventArgs()
                         {
-                            Message = _parser.Parse(evt.messageChain.ToString()),
+                            Message = _parser.Parse(evt.Value<JArray>("messageChain").ToString()),
                             User = new Friend()
                             {
-                                Identity = evt.sender.id,
-                                Nickname = evt.sender.nickname,
-                                Remark = evt.sender.remark
+                                Identity = evt["sender"].Value<long>("id"),
+                                Nickname = evt["sender"].Value<string>("nickname"),
+                                Remark = evt["sender"].Value<string>("remark")
                             }
                         };
                     case "GroupMessage":
-                        return new GroupMessageEventArgs()
+                        var args = new GroupMessageEventArgs()
                         {
-                            Message = _parser.Parse(evt.messageChain.ToString()),
-                            User = new Member()
-                            {
-                                Identity = evt.sender.id,
-                                DisplayName = evt.sender.memberName,
-                            },
+                            Message = _parser.Parse(evt.Value<JArray>("messageChain").ToString()),
                             Group = new Group()
                             {
-                                Identity = evt.sender.group.id,
-                                Name = evt.sender.group.name,
+                                Identity = evt["sender"]["group"].Value<long>("id"),
+                                Name = evt["sender"]["group"].Value<string>("name"),
+                            },
+                            User = new Member()
+                            {
+                                Identity = evt["sender"].Value<long>("id"),
+                                DisplayName = evt["sender"].Value<string>("memberName"),
+                                Role = evt["sender"].Value<string>("permission") switch { "OWNER" => GroupRole.Owner , "ADMINISTRATOR" => GroupRole.Administrator, _ => GroupRole.Member}
                             }
                         };
+                        args.User.Group = args.Group;
+                        return args;
+                    case "MemberCardChangeEvent":
+                        break;
+                    case "MemberLeaveEventQuit":
+                        break;
+                    case "GroupRecallEvent":
+                        break;
                     default:
-                        throw new NotImplementedException();
+                        throw new NotImplementedException("Event type not supported: " + evt.Value<string>("type"));
                 }
             }
             return null;
@@ -79,14 +87,14 @@ namespace Ac682.Hyperai.Clients.Mirai
         {
 
             var auth = _client.PostAsync("auth", new { authKey = _authKey }).GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
-            sessionKey = auth.session.Value;
-            if (auth.code == -1)
+            sessionKey = auth.Value<string>("session");
+            if (auth.Value<int>("code") == -1)
             {
                 throw new ArgumentException("Wrong MIRAI API HTTP auth key");
             }
 
             var verify = _client.PostAsync("verify", new { sessionKey = this.sessionKey, qq = _selfQQ }).GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
-            if(verify.code != 0) throw new ArgumentException(verify.msg);
+            if (verify.Value<int>("code") != 0) throw new ArgumentException(verify.Value<string>("msg"));
 
             State = ApiClientConnectionState.Connected;
         }
@@ -99,9 +107,9 @@ namespace Ac682.Hyperai.Clients.Mirai
             {
                 list.Add(new Friend()
                 {
-                    Identity = friend.id,
-                    Nickname = friend.nickname,
-                    Remark = friend.remark
+                    Identity = friend.Value<long>("id"),
+                    Nickname = friend.Value<string>("nickname"),
+                    Remark = friend.Value<string>("remark")
                 });
             }
             return list;
@@ -115,31 +123,33 @@ namespace Ac682.Hyperai.Clients.Mirai
             {
                 list.Add(new Group()
                 {
-                    Identity = group.id,
-                    Name = group.name
+                    Identity = group.Value<long>("id"),
+                    Name = group.Value<string>("name")
                 });
             }
             return list;
         }
 
-        public async Task<int> SendFriendMessageAsync(Friend friend, MessageChain chain)
+        public async Task<long> SendFriendMessageAsync(Friend friend, MessageChain chain)
         {
-            var message = await (await _client.PostAsync("sendFriendMessage", new { sessionKey = this.sessionKey, target = friend.Identity, messageChain = _formatter.Format(chain) })).GetJsonObjectAsync();
-            if (message.code != 0)
+            var response = await _client.PostAsync("sendFriendMessage", new { sessionKey = this.sessionKey, target = friend.Identity, messageChain = chain.AsReadable() });
+            var message = await response.GetJsonObjectAsync();
+            if (message.Value<int>("code") != 0)
             {
-                throw new Exception(message.msg);
+                throw new Exception(message.Value<string>("msg"));
             }
-            return message.messageId;
+            return message.Value<long>("messageId");
         }
 
-        public async Task<int> SendGroupMessageAsync(Group group, MessageChain chain)
+        public async Task<long> SendGroupMessageAsync(Group group, MessageChain chain)
         {
-            var message = await (await _client.PostAsync("sendGroupMessage", new { sessionKey = this.sessionKey, target = group.Identity, messageChain = _formatter.Format(chain) })).GetJsonObjectAsync();
-            if (message.code != 0)
+            var response = await _client.PostAsync("sendGroupMessage", new { sessionKey = this.sessionKey, target = group.Identity, messageChain = chain.AsReadable() });
+            var message = await response.GetJsonObjectAsync();
+            if (message.Value<int>("code") != 0)
             {
-                throw new Exception(message.msg);
+                throw new Exception(message.Value<string>("msg"));
             }
-            return message.messageId;
+            return message.Value<long>("messageId");
         }
 
         public void Disconnect()

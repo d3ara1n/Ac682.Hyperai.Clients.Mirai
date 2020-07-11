@@ -1,13 +1,13 @@
 ﻿using Hyperai.Events;
+using Hyperai.Messages;
 using Hyperai.Relations;
 using Hyperai.Services;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Options;
 using System.Threading;
-using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
 
 namespace Ac682.Hyperai.Clients.Mirai
 {
@@ -21,12 +21,13 @@ namespace Ac682.Hyperai.Clients.Mirai
 
         private readonly MiraiClientOptions _options;
         private readonly ILogger<MiraiClient> _logger;
+        private readonly IMessageChainFormatter _formatter;
 
-        public MiraiClient(MiraiClientOptions options, ILogger<MiraiClient> logger)
+        public MiraiClient(MiraiClientOptions options, ILogger<MiraiClient> logger, IMessageChainFormatter formatter)
         {
             _options = options;
             _logger = logger;
-
+            _formatter = formatter;
             _session = new MiraiHttpSession(options.Host, options.Port, options.AuthKey, options.SelfQQ);
         }
 
@@ -81,8 +82,10 @@ namespace Ac682.Hyperai.Clients.Mirai
                 var evt = _session.PullEvent();
                 if (evt != null)
                 {
+                    _logger.LogInformation("Event received: " + evt);
                     InvokeHandler(evt);
                 }
+                Thread.Sleep(100);
             }
             Disconnect();
         }
@@ -108,6 +111,10 @@ namespace Ac682.Hyperai.Clients.Mirai
             {
                 return (T)Convert.ChangeType((await _session.GetGroupsAsync()).Where(x => x.Identity == ((Group)Convert.ChangeType(id, typeof(Group))).Identity).FirstOrDefault(), typeof(T));
             }
+            else if (typeof(T) == typeof(Self))
+            {
+                return (T)Convert.ChangeType(new Self() { Groups = await _session.GetGroupsAsync(), Friends = await _session.GetFriendsAsync() }, typeof(T));
+            }
             return default(T);
         }
 
@@ -124,6 +131,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                 default:
                     throw new NotImplementedException();
             }
+            _logger.LogInformation("EventArgs sendt: {0}", args);
         }
 
         public string RequestRawAsync(string resource)
