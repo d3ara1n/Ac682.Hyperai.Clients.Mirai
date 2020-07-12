@@ -65,19 +65,13 @@ namespace Ac682.Hyperai.Clients.Mirai
                             {
                                 Identity = evt["sender"].Value<long>("id"),
                                 DisplayName = evt["sender"].Value<string>("memberName"),
-                                Role = evt["sender"].Value<string>("permission") switch { "OWNER" => GroupRole.Owner , "ADMINISTRATOR" => GroupRole.Administrator, _ => GroupRole.Member}
+                                Role = evt["sender"].Value<string>("permission") switch { "OWNER" => GroupRole.Owner, "ADMINISTRATOR" => GroupRole.Administrator, _ => GroupRole.Member }
                             }
                         };
                         args.User.Group = args.Group;
                         return args;
-                    case "MemberCardChangeEvent":
-                        break;
-                    case "MemberLeaveEventQuit":
-                        break;
-                    case "GroupRecallEvent":
-                        break;
                     default:
-                        throw new NotImplementedException("Event type not supported: " + evt.Value<string>("type"));
+                        break;
                 }
             }
             return null;
@@ -121,10 +115,31 @@ namespace Ac682.Hyperai.Clients.Mirai
             var list = new List<Group>();
             foreach (var group in groups)
             {
-                list.Add(new Group()
+                var ins = new Group()
                 {
                     Identity = group.Value<long>("id"),
                     Name = group.Value<string>("name")
+                };
+                // TODO: uncomment when it wont cause error
+                // var members = await GetMembersAsync(ins);
+                // ins.Members = members;
+                list.Add(ins);
+            }
+            return list;
+        }
+
+        private async Task<IEnumerable<Member>> GetMembersAsync(Group group)
+        {
+            var members = await (await _client.GetAsync($"memberList?sessionKey={sessionKey}")).GetJsonObjectAsync();
+            var list = new List<Member>();
+            foreach (var member in members)
+            {
+                list.Add(new Member()
+                {
+                    Identity = member.Value<long>("id"),
+                    DisplayName = member.Value<string>("memberName"),
+                    Role = member.Value<string>("permission") switch { "OWNER" => GroupRole.Owner, "ADMINISTRATOR" => GroupRole.Administrator, _ => GroupRole.Member },
+                    Group = group
                 });
             }
             return list;
