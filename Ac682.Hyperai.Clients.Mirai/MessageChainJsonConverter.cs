@@ -21,7 +21,7 @@ namespace Ac682.Hyperai.Clients.Mirai
             var text = value != null ? formatter.Format(value) : null;
             if (text != null)
             {
-                writer.WriteRaw(text);
+                writer.WriteRawValue(text);
             }
         }
     }

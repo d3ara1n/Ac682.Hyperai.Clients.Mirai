@@ -25,14 +25,19 @@ namespace Ac682.Hyperai.Clients.Mirai
             return await client.GetAsync(action);
         }
 
-        public async Task<HttpResponseMessage> PostAsync(string action, object body)
+        public async Task<HttpResponseMessage> PostAsync(string action, HttpContent content)
+        {
+            return await client.PostAsync(action, content);
+        }
+
+        public async Task<HttpResponseMessage> PostObjectAsync(string action, object body)
         {
             var settings = new JsonSerializerSettings();
             settings.Formatting = Formatting.Indented;
             settings.NullValueHandling = NullValueHandling.Ignore;
             settings.Converters.Add(new MessageChainJsonConverter());
-            var content = JsonConvert.SerializeObject(body, settings).Replace("null", string.Empty);
-            return await client.PostAsync(action, new StringContent(content));
+            var content = JsonConvert.SerializeObject(body, settings);
+            return await PostAsync(action, new StringContent(content));
         }
     }
 }

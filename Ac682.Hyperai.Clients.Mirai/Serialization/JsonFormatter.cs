@@ -22,7 +22,11 @@ namespace Ac682.Hyperai.Clients.Mirai.Serialization
                     Face it => new { type = "Face", faceId = it.FaceId },
                     Quote it => new { type = "Quote", id = it.MessageId },
                     AtAll it => new { type = "AtAll" },
-                    Image it => new { type = "Image", url = it.IsRemote ? it.Url.AbsoluteUri : null, path = it.IsRemote ? null : it.Url.LocalPath },
+                    Image it => new { type = "Image", url = it.Url.AbsoluteUri },
+                    Flash it => new { type = "Flash", url = it.Url.AbsoluteUri },
+                    AppContent it => new { type = "App", content = it.Content },
+                    JsonContent it => new { type = "Json", content = it.Content },
+                    XmlContent it => new { type = "Xml", content = it.Content },
                     _ => throw new NotImplementedException("MessageComponent type not supported: " + comp.TypeName)
                 });
             }

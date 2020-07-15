@@ -1,11 +1,16 @@
 using Ac682.Hyperai.Clients.Mirai.Serialization;
 using Hyperai.Events;
 using Hyperai.Messages;
+using Hyperai.Messages.ConcreteModels;
 using Hyperai.Relations;
 using Hyperai.Services;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Drawing.Imaging;
+using System.IO;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading.Tasks;
 
 namespace Ac682.Hyperai.Clients.Mirai
@@ -80,14 +85,14 @@ namespace Ac682.Hyperai.Clients.Mirai
         public void Connect()
         {
 
-            var auth = _client.PostAsync("auth", new { authKey = _authKey }).GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
+            var auth = _client.PostObjectAsync("auth", new { authKey = _authKey }).GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
             sessionKey = auth.Value<string>("session");
             if (auth.Value<int>("code") == -1)
             {
                 throw new ArgumentException("Wrong MIRAI API HTTP auth key");
             }
 
-            var verify = _client.PostAsync("verify", new { sessionKey = this.sessionKey, qq = _selfQQ }).GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
+            var verify = _client.PostObjectAsync("verify", new { sessionKey = this.sessionKey, qq = _selfQQ }).GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
             if (verify.Value<int>("code") != 0) throw new ArgumentException(verify.Value<string>("msg"));
 
             State = ApiClientConnectionState.Connected;
@@ -147,7 +152,8 @@ namespace Ac682.Hyperai.Clients.Mirai
 
         public async Task<long> SendFriendMessageAsync(Friend friend, MessageChain chain)
         {
-            var response = await _client.PostAsync("sendFriendMessage", new { sessionKey = this.sessionKey, target = friend.Identity, messageChain = chain.AsReadable() });
+            await PreprocessChainAsync(chain, MessageEventType.Friend);
+            var response = await _client.PostObjectAsync("sendFriendMessage", new { sessionKey = this.sessionKey, target = friend.Identity, messageChain = chain.AsReadable() });
             var message = await response.GetJsonObjectAsync();
             if (message.Value<int>("code") != 0)
             {
@@ -158,7 +164,8 @@ namespace Ac682.Hyperai.Clients.Mirai
 
         public async Task<long> SendGroupMessageAsync(Group group, MessageChain chain)
         {
-            var response = await _client.PostAsync("sendGroupMessage", new { sessionKey = this.sessionKey, target = group.Identity, messageChain = chain.AsReadable() });
+            await PreprocessChainAsync(chain, MessageEventType.Group);
+            var response = await _client.PostObjectAsync("sendGroupMessage", new { sessionKey = this.sessionKey, target = group.Identity, messageChain = chain.AsReadable() });
             var message = await response.GetJsonObjectAsync();
             if (message.Value<int>("code") != 0)
             {
@@ -167,11 +174,66 @@ namespace Ac682.Hyperai.Clients.Mirai
             return message.Value<long>("messageId");
         }
 
+        private async Task PreprocessChainAsync(MessageChain chain, MessageEventType type)
+        {
+            foreach (var cmp in chain)
+            {
+                if (cmp is Image image && string.IsNullOrEmpty(image.ImageId))
+                {
+                    await UploadImageAsync(image, type);
+                }
+            }
+        }
+
+        async Task UploadImageAsync(Image image, MessageEventType type)
+        {
+            var content = new MultipartFormDataContent();
+            content.Add(new StringContent(sessionKey), "sessionKey");
+            content.Add(new StringContent(type switch { MessageEventType.Friend => "friend", MessageEventType.Group => "group", _ => throw new NotImplementedException() }), "type");
+            var imageStream = image.OpenRead();
+            string format;
+            using (System.Drawing.Image img = System.Drawing.Image.FromStream(imageStream))
+            {
+                format = img.RawFormat.ToString();
+                switch (format)
+                {
+                    case nameof(ImageFormat.Jpeg):
+                    case nameof(ImageFormat.Png):
+                    case nameof(ImageFormat.Gif):
+                        {
+                            format = format.ToLower();
+                            break;
+                        }
+                    default:
+                        {
+                            MemoryStream ms = new MemoryStream();
+                            img.Save(ms, ImageFormat.Png);
+                            imageStream.Dispose();
+                            imageStream = ms;
+                            format = "png";
+                            break;
+                        }
+                }
+            }
+            imageStream.Seek(0, SeekOrigin.Begin);
+            HttpContent imageContent = new StreamContent(imageStream);
+            imageContent.Headers.ContentDisposition = new ContentDispositionHeaderValue("form-data")
+            {
+                Name = "img",
+                FileName = $"{Guid.NewGuid():n}.{format}"
+            };
+            imageContent.Headers.ContentType = new MediaTypeHeaderValue("image/" + format);
+            content.Add(imageContent, "img");
+            var resp = await (await _client.PostAsync("uploadImage", content)).GetJsonObjectAsync();
+            image.ImageId = resp.Value<string>("imageId");
+            image.Url = new Uri(resp.Value<string>("url"));
+        }
+
         public void Disconnect()
         {
             if (State == ApiClientConnectionState.Connected)
             {
-                var release = _client.PostAsync("release", new { sessionKey = this.sessionKey, qq = _selfQQ }).GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
+                var release = _client.PostObjectAsync("release", new { sessionKey = this.sessionKey, qq = _selfQQ }).GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
                 State = ApiClientConnectionState.Disconnected;
             }
         }
