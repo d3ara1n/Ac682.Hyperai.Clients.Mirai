@@ -10,10 +10,10 @@ namespace Ac682.Hyperai.Clients.Mirai.Serialization
     {
         public string Format(MessageChain chain)
         {
-            var list = new LinkedList<object>();
-            foreach (var comp in chain)
+            LinkedList<object> list = new LinkedList<object>();
+            foreach (MessageComponent comp in chain)
             {
-                list.AddFirst(
+                list.AddLast(
                 comp switch
                 {
                     Plain it => new { type = "Plain", text = it.Text },

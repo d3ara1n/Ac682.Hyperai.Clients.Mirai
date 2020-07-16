@@ -10,9 +10,9 @@ namespace Ac682.Hyperai.Clients.Mirai.Serialization
     {
         public MessageChain Parse(string text)
         {
-            var array = JsonConvert.DeserializeObject<JArray>(text);
-            var builder = new MessageChainBuilder();
-            foreach (var it in array)
+            JArray array = JsonConvert.DeserializeObject<JArray>(text);
+            MessageChainBuilder builder = new MessageChainBuilder();
+            foreach (JToken it in array)
             {
                 builder.Add(it.Value<string>("type") switch
                 {

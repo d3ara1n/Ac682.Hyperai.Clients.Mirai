@@ -16,13 +16,13 @@ namespace Ac682.Hyperai.Clients.Mirai
             cache.SetObjectAsync<T>(key, obj).Wait();
         }
 
-        public async static Task SetObjectAsync<T>(this IDistributedCache cache, string key, T obj)
+        public static async Task SetObjectAsync<T>(this IDistributedCache cache, string key, T obj)
         {
-            var json = JsonConvert.SerializeObject(obj);
+            string json = JsonConvert.SerializeObject(obj);
             await cache.SetStringAsync(key, json);
         }
 
-        public async static Task<T> GetObjectAsync<T>(this IDistributedCache cache, string key)
+        public static async Task<T> GetObjectAsync<T>(this IDistributedCache cache, string key)
         {
             string json = await cache.GetStringAsync(key);
             if (json != null)

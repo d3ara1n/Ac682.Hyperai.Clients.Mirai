@@ -16,7 +16,7 @@ namespace Ac682.Hyperai.Clients.Mirai
     {
         public ApiClientConnectionState State => _session.State;
 
-        List<(Type, object)> handlers = new List<(Type, object)>();
+        private readonly List<(Type, object)> handlers = new List<(Type, object)>();
 
         private readonly MiraiHttpSession _session;
 
@@ -43,7 +43,7 @@ namespace Ac682.Hyperai.Clients.Mirai
 
         private void InvokeHandler<T>(T args) where T : GenericEventArgs
         {
-            foreach (var handler in handlers.Where(x => x.Item1.IsAssignableFrom(typeof(T))).Select(x => x.Item2))
+            foreach (object handler in handlers.Where(x => x.Item1.IsAssignableFrom(typeof(T))).Select(x => x.Item2))
             {
                 handler.GetType().GetMethod("Handle").Invoke(handler, new object[] { args });
             }
@@ -51,7 +51,7 @@ namespace Ac682.Hyperai.Clients.Mirai
 
         private void InvokeHandler(GenericEventArgs args)
         {
-            foreach (var handler in handlers.Where(x => x.Item1.IsAssignableFrom(args.GetType())).Select(x => x.Item2))
+            foreach (object handler in handlers.Where(x => x.Item1.IsAssignableFrom(args.GetType())).Select(x => x.Item2))
             {
                 handler.GetType().GetMethod("Handle").Invoke(handler, new object[] { args });
             }
@@ -68,7 +68,7 @@ namespace Ac682.Hyperai.Clients.Mirai
             GC.SuppressFinalize(this);
         }
 
-        bool isDisposed = false;
+        private readonly bool isDisposed = false;
         protected virtual void Dispose(bool isDisposing)
         {
             if (!isDisposed && isDisposing)
@@ -82,7 +82,7 @@ namespace Ac682.Hyperai.Clients.Mirai
         {
             while (State == ApiClientConnectionState.Connected)
             {
-                var evt = _session.PullEvent();
+                GenericEventArgs evt = _session.PullEvent();
                 if (evt != null)
                 {
                     _logger.LogInformation("Event received: " + evt);
@@ -108,56 +108,34 @@ namespace Ac682.Hyperai.Clients.Mirai
         {
             if (typeof(T) == typeof(Friend))
             {
-                var friend = await _cache.GetObjectAsync<Friend>($"_FRIEND@{ChangeType<Friend>(id).Identifier}");
-                if (friend != null)
-                {
-                    return ChangeType<T>(friend);
-                }
-                friend = (await _session.GetFriendsAsync()).Where(x => x.Identity == ((Friend)Convert.ChangeType(id, typeof(Friend))).Identity).FirstOrDefault();
-                await _cache.SetObjectAsync($"_FRIEND@{ChangeType<Friend>(id).Identifier}", friend);
-                return ChangeType<T>(friend);
+                Friend friend = (await _session.GetFriendsAsync()).FirstOrDefault(x => x.Identity == ((Friend)Convert.ChangeType(id, typeof(Friend))).Identity);
+                return ChangeType<T>(friend) ?? id;
 
             }
             else if (typeof(T) == typeof(Group))
             {
-                // 💢 Do NOT use JSON to serialize
-
-                //var group = await _cache.GetObjectAsync<Group>($"_GROUP@{ChangeType<Group>(id).Identifier}");
-                //if (group != null)
-                //{
-                //    return ChangeType<T>(group);
-                //}
-
-                return ChangeType<T>((await _session.GetGroupsAsync()).Where(x => x.Identity == (ChangeType<Group>(id)).Identity).FirstOrDefault());
+                return ChangeType<T>((await _session.GetGroupsAsync()).FirstOrDefault(x => x.Identity == (ChangeType<Group>(id)).Identity)) ?? id;
             }
             else if (typeof(T) == typeof(Self))
             {
-                //var self = await _cache.GetObjectAsync<Self>($"_SELF");
-                //if (self != null)
-                //{
-                //    return ChangeType<T>(self);
-                //}
-                return ChangeType<T>(new Self() { Groups = await _session.GetGroupsAsync(), Friends = await _session.GetFriendsAsync() });
+                return ChangeType<T>(new Self() { Groups = await _session.GetGroupsAsync(), Friends = await _session.GetFriendsAsync() }) ?? id;
             }
             else if (typeof(T) == typeof(Member))
             {
-                // So does member
-
-                //var member = await _cache.GetObjectAsync<Member>($"_MEMBER@{ChangeType<Member>(id).Identifier}");
-                //if (member != null)
-                //{
-                //    return ChangeType<T>(member);
-                //}
-                var idMember = ChangeType<Member>(id);
-                var group = await RequestAsync(idMember.Group);
-                return ChangeType<T>(group.Members.Where(x => x.Identifier == idMember.Identifier).FirstOrDefault());
+                Member idMember = ChangeType<Member>(id);
+                Group group = await RequestAsync(idMember.Group);
+                return ChangeType<T>(group.Members.FirstOrDefault(x => x.Identifier == idMember.Identifier)) ?? id;
             }
-            return default(T);
+            return id;
         }
 
         private T ChangeType<T>(object o)
         {
-            if (o == null) return default(T);
+            if (o == null)
+            {
+                return default(T);
+            }
+
             return (T)Convert.ChangeType(o, typeof(T));
         }
 
