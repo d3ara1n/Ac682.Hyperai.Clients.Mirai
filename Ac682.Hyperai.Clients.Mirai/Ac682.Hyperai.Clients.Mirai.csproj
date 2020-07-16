@@ -22,7 +22,6 @@
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="System.Drawing.Common" Version="5.0.0-preview.6.20305.6" />
     <PackageReference Include="Hyperai.Abstractions" Version="2020.7.17" />
-    Hyperai.Abstractions
   </ItemGroup>
 
 
