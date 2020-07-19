@@ -45,40 +45,282 @@ namespace Ac682.Hyperai.Clients.Mirai
             JToken fetch = _client.GetAsync($"fetchLatestMessage?sessionKey={sessionKey}&count=1").GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
             foreach (JToken evt in fetch.Value<JArray>("data"))
             {
+                #region 事件工厂
                 switch (evt.Value<string>("type"))
                 {
                     case "FriendMessage":
-                        return new FriendMessageEventArgs()
                         {
-                            Message = _parser.Parse(evt.Value<JArray>("messageChain").ToString()),
-                            User = new Friend()
+                            var args = new FriendMessageEventArgs()
                             {
-                                Identity = evt["sender"].Value<long>("id"),
-                                Nickname = evt["sender"].Value<string>("nickname"),
-                                Remark = evt["sender"].Value<string>("remark")
-                            }
-                        };
+                                Message = _parser.Parse(evt.Value<JArray>("messageChain").ToString()),
+                                User = new Friend()
+                                {
+                                    Identity = evt["sender"].Value<long>("id"),
+                                    Nickname = evt["sender"].Value<string>("nickname"),
+                                    Remark = evt["sender"].Value<string>("remark")
+                                }
+                            };
+                            return args;
+                        }
                     case "GroupMessage":
-                        GroupMessageEventArgs args = new GroupMessageEventArgs()
                         {
-                            Message = _parser.Parse(evt.Value<JArray>("messageChain").ToString()),
-                            Group = new Group()
+                            var args = new GroupMessageEventArgs()
                             {
-                                Identity = evt["sender"]["group"].Value<long>("id"),
-                                Name = evt["sender"]["group"].Value<string>("name"),
-                            },
-                            User = new Member()
+                                Message = _parser.Parse(evt.Value<JArray>("messageChain").ToString()),
+                                User = OfMember(evt["sender"], evt["group"]),
+                            };
+                            args.Group = args.User.Group;
+                            return args;
+                        }
+                    case "GroupRecallEvent":
+                        {
+                            var args = new GroupRecallEventArgs()
                             {
-                                Identity = evt["sender"].Value<long>("id"),
-                                DisplayName = evt["sender"].Value<string>("memberName"),
-                                Role = evt["sender"].Value<string>("permission") switch { "OWNER" => GroupRole.Owner, "ADMINISTRATOR" => GroupRole.Administrator, _ => GroupRole.Member }
-                            }
-                        };
-                        args.User.Group = args.Group;
-                        return args;
+                                WhoseMessage = evt.Value<long>("authorId"),
+                                MessageId = evt.Value<long>("messageId"),
+                                Operator = OfMember(evt["operator"], evt["group"])
+                            };
+                            args.Group = args.Operator.Group;
+                            return args;
+                        }
+                    case "FriendRecallEvent":
+                        {
+                            var args = new FriendRecallEventArgs()
+                            {
+                                MessageId = evt.Value<long>("messageId"),
+                                Operator = evt.Value<long>("operator"),
+                                WhoseMessage = evt.Value<long>("authorId")
+                            };
+                            return args;
+                        }
+                    case "BotGroupPermissionChangeEvent":
+                        {
+                            var args = new GroupSelfPermissionChangedEventArgs()
+                            {
+                                Original = OfRole(evt.Value<string>("origin")),
+                                Present = OfRole(evt.Value<string>("current")),
+                            };
+                            args.Group = OfGroup(evt["group"]);
+                            return args;
+                        }
+                    case "BotMuteEvent":
+                        {
+                            var args = new GroupSelfMutedEventArgs()
+                            {
+                                Duration = evt.Value<long>("duration"),
+                                Operator = OfMember(evt["operator"], evt["operator"]["group"]),
+                            };
+                            args.Group = args.Operator.Group;
+                            return args;
+                        }
+                    case "BotUnmuteEvent":
+                        {
+                            var args = new GroupSelfUnmutedEventArgs()
+                            {
+                                Operator = OfMember(evt["operator"], evt["opeartor"]["group"])
+                            };
+                            args.Group = args.Operator.Group;
+                            return args;
+                        }
+                    case "BotLeaveEventActive":
+                        {
+                            var args = new GroupSelfLeftEventArgs()
+                            {
+                                IsKicked = false,
+                                Operator = GetMemberInfoAsync(_selfQQ, evt["group"].Value<long>("id")).GetAwaiter().GetResult()
+                            };
+                            args.Group = args.Operator.Group;
+                            return args;
+                        }
+                    case "BotLeaveEventKick":
+                        {
+                            var args = new GroupSelfLeftEventArgs()
+                            {
+                                IsKicked = true,
+                                Operator = GetMemberInfoAsync(_selfQQ, evt["group"].Value<long>("id")).GetAwaiter().GetResult()
+                            };
+                            args.Group = args.Operator.Group;
+                            return args;
+                        }
+                    case "GroupNameChangeEvent":
+                        {
+                            var args = new GroupNameChangedEventArgs()
+                            {
+                                Original = evt.Value<string>("origin"),
+                                Present = evt.Value<string>("current"),
+                                Operator = OfMember(evt["operator"], evt["group"])
+                            };
+                            args.Group = args.Operator.Group;
+                            return args;
+                        }
+                    case "GroupMuteAllEvent":
+                        {
+                            var args = new GroupAllMutedEventArgs()
+                            {
+                                IsEnded = !evt.Value<bool>("current"),
+                                Operator = OfMember(evt["operator"], evt["group"]),
+                            };
+                            args.Group = args.Operator.Group;
+                            return args;
+                        }
+                    case "MemberJoinEvent":
+                        {
+                            var args = new GroupMemberJoinedEventArgs()
+                            {
+                                Who = OfMember(evt["member"], evt["member"]["group"])
+                            };
+                            args.Group = args.Who.Group;
+                            return args;
+                        }
+                    case "MemberLeaveEventKick":
+                        {
+                            var args = new GroupMemberLeftEventArgs()
+                            {
+                                IsKicked = true,
+                                Who = OfMember(evt["member"], evt["member"]["group"]),
+                                Operator = OfMember(evt["operator"], evt["operator"]["group"])
+                            };
+                            args.Group = args.Who.Group;
+                            return args;
+                        }
+                    case "MemberLeaveEventQuit":
+                        {
+                            var args = new GroupMemberLeftEventArgs()
+                            {
+                                IsKicked = false,
+                                Who = OfMember(evt["member"], evt["member"]["group"]),
+                            };
+                            args.Operator = args.Who;
+                            args.Group = args.Who.Group;
+                            return args;
+                        }
+                    case "MemberCardChangeEvent":
+                        {
+                            var args = new GroupMemberCardChangedEventArgs()
+                            {
+                                IsSelfOperated = false,
+                                Original = evt.Value<string>("origin"),
+                                Present = evt.Value<string>("current"),
+                                Operator = OfMember(evt["operator"], evt["operator"]["group"])
+                            };
+                            args.Group = args.WhoseName.Group;
+                            return args;
+                        }
+                    case "MemberSpecialTitleChangeEvent":
+                        {
+                            var args = new GroupMemberTitleChangedEventArgs()
+                            {
+                                Original = evt.Value<string>("origin"),
+                                Present = evt.Value<string>("current"),
+                                Who = OfMember(evt["member"], evt["member"]["group"])
+                            };
+                            args.Group = args.Who.Group;
+                            return args;
+                        }
+                    case "MemberPermissionChangeEvent":
+                        {
+                            var args = new GroupMemberPermissionChangedEventArgs()
+                            {
+                                Original = OfRole(evt.Value<string>("origin")),
+                                Present = OfRole(evt.Value<string>("current")),
+                                Whom = OfMember(evt["member"], evt["member"]["group"])
+                            };
+                            args.Group = args.Whom.Group;
+                            return args;
+                        }
+                    case "MemberMuteEvent":
+                        {
+                            var args = new GroupMemberMutedEventArgs()
+                            {
+                                Duration = evt.Value<long>("duration"),
+                                Whom = OfMember(evt["member"], evt["member"]["group"]),
+                                Operator = OfMember(evt["operator"], evt["operator"]["group"]),
+                            };
+                            args.Group = args.Whom.Group;
+                            return args;
+                        }
+                    case "MemberUnmuteEvent":
+                        {
+                            var args = new GroupMemberUnmutedEventArgs()
+                            {
+                                Operator = OfMember(evt["operator"], evt["operator"]["group"]),
+                                Whom = OfMember(evt["member"], evt["member"]["group"])
+                            };
+                            args.Group = args.Whom.Group;
+                            return args;
+                        }
+                    case "NewFriendRequestEvent":
+                        {
+                            var args = new FriendRequestEventArgs()
+                            {
+                                EventId = evt.Value<long>("eventId"),
+                                FromWhom = evt.Value<long>("fromId"),
+                                FromWhichGroup = evt.Value<long>("groupId"),
+                                DisplayName = evt.Value<string>("nick"),
+                                AttachedMessage = evt.Value<string>("message")
+                            };
+                            return args;
+                        }
+                    case "MemberJoinRequestEvent":
+                        {
+                            var args = new GroupMemberRequestEventArgs()
+                            {
+                                EventId = evt.Value<long>("eventId"),
+                                FromWhom = evt.Value<long>("fromId"),
+                                InWhichGroup = evt.Value<long>("groupId"),
+                                DisplayName = evt.Value<string>("nick"),
+                                GroupDisplayName = evt.Value<string>("groupName"),
+                                AttachedMessage = evt.Value<string>("message")
+                            };
+                            return args;
+                        }
+                    case "BotInvitedJoinGroupRequestEvent":
+                        {
+                            var args = new SelfInvitedIntoGroupEventArgs()
+                            {
+                                EventId = evt.Value<long>("eventId"),
+                                IntoWhichGroup = evt.Value<long>("groupId"),
+                                OperatorId = evt.Value<long>("fromId"),
+                                OperatorDisplayName = evt.Value<string>("nick"),
+                                AttachedMessage = evt.Value<string>("message"),
+                            };
+                            return args;
+                        }
                     default:
                         break;
                 }
+                #endregion
+            }
+            GroupRole OfRole(string name)
+            {
+                return name switch
+                {
+                    "OWNER" => GroupRole.Owner,
+                    "ADMINISTRATOR" => GroupRole.Administrator,
+                    _ => GroupRole.Member
+                };
+            }
+            Member OfMember(JToken member, JToken group)
+            {
+                var res = new Member()
+                {
+                    Identity = member.Value<long>("id"),
+                    DisplayName = member.Value<string>("memberName"),
+                    Role = OfRole(member.Value<string>("permission"))
+                };
+                res.Group = OfGroup(group);
+                return res;
+            }
+            Group OfGroup(JToken group)
+            {
+                var res = new Group()
+                {
+                    Identity = group.Value<long>("id"),
+                    Name = group.Value<string>("name"),
+                };
+                res.Members = GetMembersAsync(res).GetAwaiter().GetResult();
+                res.Owner = res.Members.FirstOrDefault(x => x.Role == GroupRole.Owner);
+                return res;
             }
             return null;
         }
@@ -104,55 +346,115 @@ namespace Ac682.Hyperai.Clients.Mirai
 
         public async Task<IEnumerable<Friend>> GetFriendsAsync()
         {
-            JToken friends = await (await _client.GetAsync($"friendList?sessionKey={sessionKey}")).GetJsonObjectAsync();
-            List<Friend> list = new List<Friend>();
-            foreach (JToken friend in friends)
+            try
             {
-                list.Add(new Friend()
+                JToken friends = await (await _client.GetAsync($"friendList?sessionKey={sessionKey}")).GetJsonObjectAsync();
+                List<Friend> list = new List<Friend>();
+                foreach (JToken friend in friends)
                 {
-                    Identity = friend.Value<long>("id"),
-                    Nickname = friend.Value<string>("nickname"),
-                    Remark = friend.Value<string>("remark")
-                });
+                    list.Add(new Friend()
+                    {
+                        Identity = friend.Value<long>("id"),
+                        Nickname = friend.Value<string>("nickname"),
+                        Remark = friend.Value<string>("remark")
+                    });
+                }
+                return list;
             }
-            return list;
+            catch
+            {
+                return Enumerable.Empty<Friend>();
+            }
+        }
+
+        public async Task<Member> GetMemberInfoAsync(long memberId, long groupId)
+        {
+            try
+            {
+                JToken info = await (await _client.GetAsync($"memberInfo?sessionKey={sessionKey}&target={groupId}&memberId={memberId}")).GetJsonObjectAsync();
+                var member = new Member()
+                {
+                    Identity = memberId,
+                    Nickname = info.Value<string>("name"),
+                    Title = info.Value<string>("specialTitle"),
+                    Role = GroupRole.Member, // 无法从 api 中得知
+                    Group = await GetGroupInfoAsync(groupId)
+                };
+                return member;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public async Task<Group> GetGroupInfoAsync(long groupId)
+        {
+            try
+            {
+                JToken info = await (await _client.GetAsync($"groupConfig?sessionKey={sessionKey}&target={groupId}")).GetJsonObjectAsync();
+                var group = new Group()
+                {
+                    Name = info.Value<string>("name"),
+                };
+                group.Members = await GetMembersAsync(group);
+                group.Owner = group.Members.FirstOrDefault(x => x.Role == GroupRole.Owner);
+                return group;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         public async Task<IEnumerable<Group>> GetGroupsAsync()
         {
-            JToken groups = await (await _client.GetAsync($"groupList?sessionKey={sessionKey}")).GetJsonObjectAsync();
-            List<Group> list = new List<Group>();
-            foreach (JToken group in groups)
+            try
             {
-                Group ins = new Group()
+                JToken groups = await (await _client.GetAsync($"groupList?sessionKey={sessionKey}")).GetJsonObjectAsync();
+                List<Group> list = new List<Group>();
+                foreach (JToken group in groups)
                 {
-                    Identity = group.Value<long>("id"),
-                    Name = group.Value<string>("name")
-                };
-                // TODO: uncomment when it wont cause error
-                // var members = await GetMembersAsync(ins);
-                // ins.Members = members;
-                ins.Members = Enumerable.Empty<Member>();
-                list.Add(ins);
+                    Group ins = new Group()
+                    {
+                        Identity = group.Value<long>("id"),
+                        Name = group.Value<string>("name")
+                    };
+                    var members = await GetMembersAsync(ins);
+                    ins.Members = members;
+                    ins.Members = Enumerable.Empty<Member>();
+                    list.Add(ins);
+                }
+                return list;
             }
-            return list;
+            catch
+            {
+                return Enumerable.Empty<Group>();
+            }
         }
 
         private async Task<IEnumerable<Member>> GetMembersAsync(Group group)
         {
-            JToken members = await (await _client.GetAsync($"memberList?sessionKey={sessionKey}")).GetJsonObjectAsync();
-            List<Member> list = new List<Member>();
-            foreach (JToken member in members)
+            try
             {
-                list.Add(new Member()
+                JToken members = await (await _client.GetAsync($"memberList?sessionKey={sessionKey}")).GetJsonObjectAsync();
+                List<Member> list = new List<Member>();
+                foreach (JToken member in members)
                 {
-                    Identity = member.Value<long>("id"),
-                    DisplayName = member.Value<string>("memberName"),
-                    Role = member.Value<string>("permission") switch { "OWNER" => GroupRole.Owner, "ADMINISTRATOR" => GroupRole.Administrator, _ => GroupRole.Member },
-                    Group = group
-                });
+                    list.Add(new Member()
+                    {
+                        Identity = member.Value<long>("id"),
+                        DisplayName = member.Value<string>("memberName"),
+                        Role = member.Value<string>("permission") switch { "OWNER" => GroupRole.Owner, "ADMINISTRATOR" => GroupRole.Administrator, _ => GroupRole.Member },
+                        Group = group
+                    });
+                }
+                return list;
             }
-            return list;
+            catch
+            {
+                return Enumerable.Empty<Member>();
+            }
         }
 
         public async Task<long> SendFriendMessageAsync(Friend friend, MessageChain chain)
@@ -177,6 +479,16 @@ namespace Ac682.Hyperai.Clients.Mirai
                 throw new Exception(message.Value<string>("msg"));
             }
             return message.Value<long>("messageId");
+        }
+
+        public async Task SendMemberRequestResponsedAsync(long eventId, long userId, long groupId, MemberRequestResponseOperationType action, string message)
+        {
+            await _client.PostObjectAsync("resp/memberJoinRequestEvent", new {sessionKey = this.sessionKey, eventId = eventId, fromId = userId, groupId = groupId, operate = (int)action, message = message});
+        }
+
+        public async Task SendFriendRequestResponsedAsync(long eventId, long userId, long groupId, FriendRequestResponseOperationType action, string message)
+        {
+            await _client.PostObjectAsync("resp/newFriendRequestEvent", new {sessionKey = this.sessionKey, eventId   = eventId, fromId   = userId, groupId = groupId, operate = (int)action, message= message});
         }
 
         private async Task PreprocessChainAsync(MessageChain chain, MessageEventType type)

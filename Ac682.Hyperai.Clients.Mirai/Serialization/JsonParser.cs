@@ -23,7 +23,7 @@ namespace Ac682.Hyperai.Clients.Mirai.Serialization
                     "AtAll" => new AtAll(),
                     "At" => new At(it.Value<long>("target")),
                     "Image" => new Image(it.Value<string>("imageId"), new Uri(it.Value<string>("url"))),
-                    "Flash" => new Flash(it.Value<string>("imageId"), new Uri(it.Value<string>("url"))),
+                    "FlashImage" => new Flash(it.Value<string>("imageId"), new Uri(it.Value<string>("url"))),
                     "App" => new AppContent(it.Value<string>("content")),
                     "Json" => new JsonContent(it.Value<string>("content")),
                     "Xml" => new XmlContent(it.Value<string>("content")),
