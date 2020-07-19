@@ -2,9 +2,9 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
-    <AssemblyVersion>2020.7.18</AssemblyVersion>
+    <AssemblyVersion>2020.7.20</AssemblyVersion>
     <PackageId>Ac682.Hyperai.Clients.Mirai</PackageId>
-    <Version>2020.7.18</Version>
+    <Version>2020.7.20</Version>
     <Authors>ac682</Authors>
     <Company>Unicore</Company>
     <PackageDescription>Ac682.Hyperai.Clients.Mirai</PackageDescription>
