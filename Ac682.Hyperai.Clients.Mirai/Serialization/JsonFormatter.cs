@@ -23,7 +23,7 @@ namespace Ac682.Hyperai.Clients.Mirai.Serialization
                     Quote it => new { type = "Quote", id = it.MessageId },
                     AtAll it => new { type = "AtAll" },
                     Image it => new { type = "Image", url = it.Url.AbsoluteUri },
-                    Flash it => new { type = "Flash", url = it.Url.AbsoluteUri },
+                    Flash it => new { type = "FlashImage", url = it.Url.AbsoluteUri },
                     AppContent it => new { type = "App", content = it.Content },
                     JsonContent it => new { type = "Json", content = it.Content },
                     XmlContent it => new { type = "Xml", content = it.Content },

@@ -106,15 +106,9 @@ namespace Ac682.Hyperai.Clients.Mirai
 
         public async Task<T> RequestAsync<T>(T id)
         {
-            if (typeof(T) == typeof(Friend))
+            if (typeof(T) == typeof(Group))
             {
-                Friend friend = (await _session.GetFriendsAsync()).FirstOrDefault(x => x.Identity == ((Friend)Convert.ChangeType(id, typeof(Friend))).Identity);
-                return ChangeType<T>(friend) ?? id;
-
-            }
-            else if (typeof(T) == typeof(Group))
-            {
-                return ChangeType<T>((await _session.GetGroupsAsync()).FirstOrDefault(x => x.Identity == (ChangeType<Group>(id)).Identity)) ?? id;
+                return ChangeType<T>((await _session.GetGroupInfoAsync(ChangeType<Group>(id).Identity))) ?? id;
             }
             else if (typeof(T) == typeof(Self))
             {
@@ -122,9 +116,7 @@ namespace Ac682.Hyperai.Clients.Mirai
             }
             else if (typeof(T) == typeof(Member))
             {
-                Member idMember = ChangeType<Member>(id);
-                Group group = await RequestAsync(idMember.Group);
-                return ChangeType<T>(group.Members.FirstOrDefault(x => x.Identifier == idMember.Identifier)) ?? id;
+                return ChangeType<T>(await _session.GetMemberInfoAsync(ChangeType<Member>(id).Identity, ChangeType<Member>(id).Group.Identity)) ?? id;
             }
             return id;
         }
@@ -148,6 +140,12 @@ namespace Ac682.Hyperai.Clients.Mirai
                     break;
                 case GroupMessageEventArgs groupMessage:
                     await _session.SendGroupMessageAsync(groupMessage.Group, groupMessage.Message);
+                    break;
+                case MemberRequestResponsedEventArgs mRespose:
+                    await _session.SendMemberRequestResponsedAsync(mRespose.EventId, mRespose.FromWhom, mRespose.InWhichGroup, mRespose.Operation, mRespose.MessageToAttach);
+                    break;
+                case FriendRequestResponsedEventArgs fRespose:
+                    await _session.SendFriendRequestResponsedAsync(fRespose.EventId, fRespose.FromWhom, fRespose.FromWhichGroup, fRespose.Operation, fRespose.MessageToAttach);
                     break;
                 default:
                     throw new NotImplementedException();
