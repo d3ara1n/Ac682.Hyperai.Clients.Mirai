@@ -79,6 +79,7 @@ namespace Ac682.Hyperai.Clients.Mirai
 
         public GenericEventArgs ReadEventJObject(JToken evt)
         {
+            #region 事件工厂
             switch (evt.Value<string>("type"))
             {
                 case "FriendMessage":
@@ -322,6 +323,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                 default:
                     throw new NotImplementedException(evt.Value<string>("type"));
             }
+            #endregion
         }
 
         public void Connect()
@@ -436,7 +438,7 @@ namespace Ac682.Hyperai.Clients.Mirai
         {
             try
             {
-                JToken members = await (await _client.GetAsync($"memberList?sessionKey={sessionKey}")).GetJsonObjectAsync();
+                JToken members = await (await _client.GetAsync($"memberList?sessionKey={sessionKey}&target={group.Identity}")).GetJsonObjectAsync();
                 List<Member> list = new List<Member>();
                 foreach (JToken member in members)
                 {
