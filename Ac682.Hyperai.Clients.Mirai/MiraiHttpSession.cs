@@ -19,21 +19,16 @@ namespace Ac682.Hyperai.Clients.Mirai
     public class MiraiHttpSession : IDisposable
     {
         public ApiClientConnectionState State { get; private set; } = ApiClientConnectionState.Disconnected;
-        private readonly string _host;
-        private readonly int _port;
         private readonly string _authKey;
         private readonly long _selfQQ;
 
 
         private readonly ApiHttpClient _client;
-        private readonly JsonFormatter _formatter = new JsonFormatter();
         private readonly JsonParser _parser = new JsonParser();
         private string sessionKey = null;
 
         public MiraiHttpSession(string host, int port, string authKey, long selfQQ)
         {
-            _host = host;
-            _port = port;
             _authKey = authKey;
             _selfQQ = selfQQ;
 
@@ -45,284 +40,288 @@ namespace Ac682.Hyperai.Clients.Mirai
             JToken fetch = _client.GetAsync($"fetchLatestMessage?sessionKey={sessionKey}&count=1").GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
             foreach (JToken evt in fetch.Value<JArray>("data"))
             {
-                #region 事件工厂
-                switch (evt.Value<string>("type"))
-                {
-                    case "FriendMessage":
-                        {
-                            var args = new FriendMessageEventArgs()
-                            {
-                                Message = _parser.Parse(evt.Value<JArray>("messageChain").ToString()),
-                                User = new Friend()
-                                {
-                                    Identity = evt["sender"].Value<long>("id"),
-                                    Nickname = evt["sender"].Value<string>("nickname"),
-                                    Remark = evt["sender"].Value<string>("remark")
-                                }
-                            };
-                            return args;
-                        }
-                    case "GroupMessage":
-                        {
-                            var args = new GroupMessageEventArgs()
-                            {
-                                Message = _parser.Parse(evt.Value<JArray>("messageChain").ToString()),
-                                User = OfMember(evt["sender"], evt["group"]),
-                            };
-                            args.Group = args.User.Group;
-                            return args;
-                        }
-                    case "GroupRecallEvent":
-                        {
-                            var args = new GroupRecallEventArgs()
-                            {
-                                WhoseMessage = evt.Value<long>("authorId"),
-                                MessageId = evt.Value<long>("messageId"),
-                                Operator = OfMember(evt["operator"], evt["group"])
-                            };
-                            args.Group = args.Operator.Group;
-                            return args;
-                        }
-                    case "FriendRecallEvent":
-                        {
-                            var args = new FriendRecallEventArgs()
-                            {
-                                MessageId = evt.Value<long>("messageId"),
-                                Operator = evt.Value<long>("operator"),
-                                WhoseMessage = evt.Value<long>("authorId")
-                            };
-                            return args;
-                        }
-                    case "BotGroupPermissionChangeEvent":
-                        {
-                            var args = new GroupSelfPermissionChangedEventArgs()
-                            {
-                                Original = OfRole(evt.Value<string>("origin")),
-                                Present = OfRole(evt.Value<string>("current")),
-                            };
-                            args.Group = OfGroup(evt["group"]);
-                            return args;
-                        }
-                    case "BotMuteEvent":
-                        {
-                            var args = new GroupSelfMutedEventArgs()
-                            {
-                                Duration = evt.Value<long>("duration"),
-                                Operator = OfMember(evt["operator"], evt["operator"]["group"]),
-                            };
-                            args.Group = args.Operator.Group;
-                            return args;
-                        }
-                    case "BotUnmuteEvent":
-                        {
-                            var args = new GroupSelfUnmutedEventArgs()
-                            {
-                                Operator = OfMember(evt["operator"], evt["opeartor"]["group"])
-                            };
-                            args.Group = args.Operator.Group;
-                            return args;
-                        }
-                    case "BotLeaveEventActive":
-                        {
-                            var args = new GroupSelfLeftEventArgs()
-                            {
-                                IsKicked = false,
-                                Operator = GetMemberInfoAsync(_selfQQ, evt["group"].Value<long>("id")).GetAwaiter().GetResult()
-                            };
-                            args.Group = args.Operator.Group;
-                            return args;
-                        }
-                    case "BotLeaveEventKick":
-                        {
-                            var args = new GroupSelfLeftEventArgs()
-                            {
-                                IsKicked = true,
-                                Operator = GetMemberInfoAsync(_selfQQ, evt["group"].Value<long>("id")).GetAwaiter().GetResult()
-                            };
-                            args.Group = args.Operator.Group;
-                            return args;
-                        }
-                    case "GroupNameChangeEvent":
-                        {
-                            var args = new GroupNameChangedEventArgs()
-                            {
-                                Original = evt.Value<string>("origin"),
-                                Present = evt.Value<string>("current"),
-                                Operator = OfMember(evt["operator"], evt["group"])
-                            };
-                            args.Group = args.Operator.Group;
-                            return args;
-                        }
-                    case "GroupMuteAllEvent":
-                        {
-                            var args = new GroupAllMutedEventArgs()
-                            {
-                                IsEnded = !evt.Value<bool>("current"),
-                                Operator = OfMember(evt["operator"], evt["group"]),
-                            };
-                            args.Group = args.Operator.Group;
-                            return args;
-                        }
-                    case "MemberJoinEvent":
-                        {
-                            var args = new GroupMemberJoinedEventArgs()
-                            {
-                                Who = OfMember(evt["member"], evt["member"]["group"])
-                            };
-                            args.Group = args.Who.Group;
-                            return args;
-                        }
-                    case "MemberLeaveEventKick":
-                        {
-                            var args = new GroupMemberLeftEventArgs()
-                            {
-                                IsKicked = true,
-                                Who = OfMember(evt["member"], evt["member"]["group"]),
-                                Operator = OfMember(evt["operator"], evt["operator"]["group"])
-                            };
-                            args.Group = args.Who.Group;
-                            return args;
-                        }
-                    case "MemberLeaveEventQuit":
-                        {
-                            var args = new GroupMemberLeftEventArgs()
-                            {
-                                IsKicked = false,
-                                Who = OfMember(evt["member"], evt["member"]["group"]),
-                            };
-                            args.Operator = args.Who;
-                            args.Group = args.Who.Group;
-                            return args;
-                        }
-                    case "MemberCardChangeEvent":
-                        {
-                            var args = new GroupMemberCardChangedEventArgs()
-                            {
-                                IsSelfOperated = false,
-                                Original = evt.Value<string>("origin"),
-                                Present = evt.Value<string>("current"),
-                                Operator = OfMember(evt["operator"], evt["operator"]["group"])
-                            };
-                            args.Group = args.WhoseName.Group;
-                            return args;
-                        }
-                    case "MemberSpecialTitleChangeEvent":
-                        {
-                            var args = new GroupMemberTitleChangedEventArgs()
-                            {
-                                Original = evt.Value<string>("origin"),
-                                Present = evt.Value<string>("current"),
-                                Who = OfMember(evt["member"], evt["member"]["group"])
-                            };
-                            args.Group = args.Who.Group;
-                            return args;
-                        }
-                    case "MemberPermissionChangeEvent":
-                        {
-                            var args = new GroupMemberPermissionChangedEventArgs()
-                            {
-                                Original = OfRole(evt.Value<string>("origin")),
-                                Present = OfRole(evt.Value<string>("current")),
-                                Whom = OfMember(evt["member"], evt["member"]["group"])
-                            };
-                            args.Group = args.Whom.Group;
-                            return args;
-                        }
-                    case "MemberMuteEvent":
-                        {
-                            var args = new GroupMemberMutedEventArgs()
-                            {
-                                Duration = evt.Value<long>("duration"),
-                                Whom = OfMember(evt["member"], evt["member"]["group"]),
-                                Operator = OfMember(evt["operator"], evt["operator"]["group"]),
-                            };
-                            args.Group = args.Whom.Group;
-                            return args;
-                        }
-                    case "MemberUnmuteEvent":
-                        {
-                            var args = new GroupMemberUnmutedEventArgs()
-                            {
-                                Operator = OfMember(evt["operator"], evt["operator"]["group"]),
-                                Whom = OfMember(evt["member"], evt["member"]["group"])
-                            };
-                            args.Group = args.Whom.Group;
-                            return args;
-                        }
-                    case "NewFriendRequestEvent":
-                        {
-                            var args = new FriendRequestEventArgs()
-                            {
-                                EventId = evt.Value<long>("eventId"),
-                                FromWhom = evt.Value<long>("fromId"),
-                                FromWhichGroup = evt.Value<long>("groupId"),
-                                DisplayName = evt.Value<string>("nick"),
-                                AttachedMessage = evt.Value<string>("message")
-                            };
-                            return args;
-                        }
-                    case "MemberJoinRequestEvent":
-                        {
-                            var args = new GroupMemberRequestEventArgs()
-                            {
-                                EventId = evt.Value<long>("eventId"),
-                                FromWhom = evt.Value<long>("fromId"),
-                                InWhichGroup = evt.Value<long>("groupId"),
-                                DisplayName = evt.Value<string>("nick"),
-                                GroupDisplayName = evt.Value<string>("groupName"),
-                                AttachedMessage = evt.Value<string>("message")
-                            };
-                            return args;
-                        }
-                    case "BotInvitedJoinGroupRequestEvent":
-                        {
-                            var args = new SelfInvitedIntoGroupEventArgs()
-                            {
-                                EventId = evt.Value<long>("eventId"),
-                                IntoWhichGroup = evt.Value<long>("groupId"),
-                                OperatorId = evt.Value<long>("fromId"),
-                                OperatorDisplayName = evt.Value<string>("nick"),
-                                AttachedMessage = evt.Value<string>("message"),
-                            };
-                            return args;
-                        }
-                    default:
-                        break;
-                }
-                #endregion
-            }
-            GroupRole OfRole(string name)
-            {
-                return name switch
-                {
-                    "OWNER" => GroupRole.Owner,
-                    "ADMINISTRATOR" => GroupRole.Administrator,
-                    _ => GroupRole.Member
-                };
-            }
-            Member OfMember(JToken member, JToken group)
-            {
-                var res = new Member()
-                {
-                    Identity = member.Value<long>("id"),
-                    DisplayName = member.Value<string>("memberName"),
-                    Role = OfRole(member.Value<string>("permission"))
-                };
-                res.Group = OfGroup(group);
-                return res;
-            }
-            Group OfGroup(JToken group)
-            {
-                var res = new Group()
-                {
-                    Identity = group.Value<long>("id"),
-                    Name = group.Value<string>("name"),
-                };
-                res.Members = GetMembersAsync(res).GetAwaiter().GetResult();
-                res.Owner = res.Members.FirstOrDefault(x => x.Role == GroupRole.Owner);
-                return res;
+                return ReadEventJObject(evt);
             }
             return null;
+        }
+
+        GroupRole OfRole(string name)
+        {
+            return name switch
+            {
+                "OWNER" => GroupRole.Owner,
+                "ADMINISTRATOR" => GroupRole.Administrator,
+                _ => GroupRole.Member
+            };
+        }
+        Member OfMember(JToken member, JToken group)
+        {
+            var res = new Member()
+            {
+                Identity = member.Value<long>("id"),
+                DisplayName = member.Value<string>("memberName"),
+                Role = OfRole(member.Value<string>("permission"))
+            };
+            res.Group = OfGroup(group);
+            return res;
+        }
+        Group OfGroup(JToken group)
+        {
+            var res = new Group()
+            {
+                Identity = group.Value<long>("id"),
+                Name = group.Value<string>("name"),
+            };
+            res.Members = GetMembersAsync(res).GetAwaiter().GetResult();
+            res.Owner = res.Members.FirstOrDefault(x => x.Role == GroupRole.Owner);
+            return res;
+        }
+
+        public GenericEventArgs ReadEventJObject(JToken evt)
+        {
+            switch (evt.Value<string>("type"))
+            {
+                case "FriendMessage":
+                    {
+                        var args = new FriendMessageEventArgs()
+                        {
+                            Message = _parser.Parse(evt.Value<JArray>("messageChain").ToString()),
+                            User = new Friend()
+                            {
+                                Identity = evt["sender"].Value<long>("id"),
+                                Nickname = evt["sender"].Value<string>("nickname"),
+                                Remark = evt["sender"].Value<string>("remark")
+                            }
+                        };
+                        return args;
+                    }
+                case "GroupMessage":
+                    {
+                        var args = new GroupMessageEventArgs()
+                        {
+                            Message = _parser.Parse(evt.Value<JArray>("messageChain").ToString()),
+                            User = OfMember(evt["sender"], evt["sender"]["group"]),
+                        };
+                        args.Group = args.User.Group;
+                        return args;
+                    }
+                case "GroupRecallEvent":
+                    {
+                        var args = new GroupRecallEventArgs()
+                        {
+                            WhoseMessage = evt.Value<long>("authorId"),
+                            MessageId = evt.Value<long>("messageId"),
+                            Operator = OfMember(evt["operator"], evt["group"])
+                        };
+                        args.Group = args.Operator.Group;
+                        return args;
+                    }
+                case "FriendRecallEvent":
+                    {
+                        var args = new FriendRecallEventArgs()
+                        {
+                            MessageId = evt.Value<long>("messageId"),
+                            Operator = evt.Value<long>("operator"),
+                            WhoseMessage = evt.Value<long>("authorId")
+                        };
+                        return args;
+                    }
+                case "BotGroupPermissionChangeEvent":
+                    {
+                        var args = new GroupSelfPermissionChangedEventArgs()
+                        {
+                            Original = OfRole(evt.Value<string>("origin")),
+                            Present = OfRole(evt.Value<string>("current")),
+                        };
+                        args.Group = OfGroup(evt["group"]);
+                        return args;
+                    }
+                case "BotMuteEvent":
+                    {
+                        var args = new GroupSelfMutedEventArgs()
+                        {
+                            Duration = evt.Value<long>("duration"),
+                            Operator = OfMember(evt["operator"], evt["operator"]["group"]),
+                        };
+                        args.Group = args.Operator.Group;
+                        return args;
+                    }
+                case "BotUnmuteEvent":
+                    {
+                        var args = new GroupSelfUnmutedEventArgs()
+                        {
+                            Operator = OfMember(evt["operator"], evt["opeartor"]["group"])
+                        };
+                        args.Group = args.Operator.Group;
+                        return args;
+                    }
+                case "BotLeaveEventActive":
+                    {
+                        var args = new GroupSelfLeftEventArgs()
+                        {
+                            IsKicked = false,
+                            Operator = GetMemberInfoAsync(_selfQQ, evt["group"].Value<long>("id")).GetAwaiter().GetResult()
+                        };
+                        args.Group = args.Operator.Group;
+                        return args;
+                    }
+                case "BotLeaveEventKick":
+                    {
+                        var args = new GroupSelfLeftEventArgs()
+                        {
+                            IsKicked = true,
+                            Operator = GetMemberInfoAsync(_selfQQ, evt["group"].Value<long>("id")).GetAwaiter().GetResult()
+                        };
+                        args.Group = args.Operator.Group;
+                        return args;
+                    }
+                case "GroupNameChangeEvent":
+                    {
+                        var args = new GroupNameChangedEventArgs()
+                        {
+                            Original = evt.Value<string>("origin"),
+                            Present = evt.Value<string>("current"),
+                            Operator = OfMember(evt["operator"], evt["group"])
+                        };
+                        args.Group = args.Operator.Group;
+                        return args;
+                    }
+                case "GroupMuteAllEvent":
+                    {
+                        var args = new GroupAllMutedEventArgs()
+                        {
+                            IsEnded = !evt.Value<bool>("current"),
+                            Operator = OfMember(evt["operator"], evt["group"]),
+                        };
+                        args.Group = args.Operator.Group;
+                        return args;
+                    }
+                case "MemberJoinEvent":
+                    {
+                        var args = new GroupMemberJoinedEventArgs()
+                        {
+                            Who = OfMember(evt["member"], evt["member"]["group"])
+                        };
+                        args.Group = args.Who.Group;
+                        return args;
+                    }
+                case "MemberLeaveEventKick":
+                    {
+                        var args = new GroupMemberLeftEventArgs()
+                        {
+                            IsKicked = true,
+                            Who = OfMember(evt["member"], evt["member"]["group"]),
+                            Operator = OfMember(evt["operator"], evt["operator"]["group"])
+                        };
+                        args.Group = args.Who.Group;
+                        return args;
+                    }
+                case "MemberLeaveEventQuit":
+                    {
+                        var args = new GroupMemberLeftEventArgs()
+                        {
+                            IsKicked = false,
+                            Who = OfMember(evt["member"], evt["member"]["group"]),
+                        };
+                        args.Operator = args.Who;
+                        args.Group = args.Who.Group;
+                        return args;
+                    }
+                case "MemberCardChangeEvent":
+                    {
+                        var args = new GroupMemberCardChangedEventArgs()
+                        {
+                            IsSelfOperated = false,
+                            Original = evt.Value<string>("origin"),
+                            Present = evt.Value<string>("current"),
+                            Operator = OfMember(evt["operator"], evt["operator"]["group"])
+                        };
+                        args.Group = args.WhoseName.Group;
+                        return args;
+                    }
+                case "MemberSpecialTitleChangeEvent":
+                    {
+                        var args = new GroupMemberTitleChangedEventArgs()
+                        {
+                            Original = evt.Value<string>("origin"),
+                            Present = evt.Value<string>("current"),
+                            Who = OfMember(evt["member"], evt["member"]["group"])
+                        };
+                        args.Group = args.Who.Group;
+                        return args;
+                    }
+                case "MemberPermissionChangeEvent":
+                    {
+                        var args = new GroupMemberPermissionChangedEventArgs()
+                        {
+                            Original = OfRole(evt.Value<string>("origin")),
+                            Present = OfRole(evt.Value<string>("current")),
+                            Whom = OfMember(evt["member"], evt["member"]["group"])
+                        };
+                        args.Group = args.Whom.Group;
+                        return args;
+                    }
+                case "MemberMuteEvent":
+                    {
+                        var args = new GroupMemberMutedEventArgs()
+                        {
+                            Duration = evt.Value<long>("duration"),
+                            Whom = OfMember(evt["member"], evt["member"]["group"]),
+                            Operator = OfMember(evt["operator"], evt["operator"]["group"]),
+                        };
+                        args.Group = args.Whom.Group;
+                        return args;
+                    }
+                case "MemberUnmuteEvent":
+                    {
+                        var args = new GroupMemberUnmutedEventArgs()
+                        {
+                            Operator = OfMember(evt["operator"], evt["operator"]["group"]),
+                            Whom = OfMember(evt["member"], evt["member"]["group"])
+                        };
+                        args.Group = args.Whom.Group;
+                        return args;
+                    }
+                case "NewFriendRequestEvent":
+                    {
+                        var args = new FriendRequestEventArgs()
+                        {
+                            EventId = evt.Value<long>("eventId"),
+                            FromWhom = evt.Value<long>("fromId"),
+                            FromWhichGroup = evt.Value<long>("groupId"),
+                            DisplayName = evt.Value<string>("nick"),
+                            AttachedMessage = evt.Value<string>("message")
+                        };
+                        return args;
+                    }
+                case "MemberJoinRequestEvent":
+                    {
+                        var args = new GroupMemberRequestEventArgs()
+                        {
+                            EventId = evt.Value<long>("eventId"),
+                            FromWhom = evt.Value<long>("fromId"),
+                            InWhichGroup = evt.Value<long>("groupId"),
+                            DisplayName = evt.Value<string>("nick"),
+                            GroupDisplayName = evt.Value<string>("groupName"),
+                            AttachedMessage = evt.Value<string>("message")
+                        };
+                        return args;
+                    }
+                case "BotInvitedJoinGroupRequestEvent":
+                    {
+                        var args = new SelfInvitedIntoGroupEventArgs()
+                        {
+                            EventId = evt.Value<long>("eventId"),
+                            IntoWhichGroup = evt.Value<long>("groupId"),
+                            OperatorId = evt.Value<long>("fromId"),
+                            OperatorDisplayName = evt.Value<string>("nick"),
+                            AttachedMessage = evt.Value<string>("message"),
+                        };
+                        return args;
+                    }
+                default:
+                    throw new NotImplementedException(evt.Value<string>("type"));
+            }
         }
 
         public void Connect()
