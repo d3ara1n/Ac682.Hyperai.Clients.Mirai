@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30204.135
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Ac682.Hyperai.Clients.Mirai", "Ac682.Hyperai.Clients.Mirai\Ac682.Hyperai.Clients.Mirai.csproj", "{D54A4953-D759-4DB8-88EF-C39DC6A5BEE3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ac682.Hyperai.Clients.Mirai.Tests", "Ac682.Hyperai.Clients.Mirai.Tests\Ac682.Hyperai.Clients.Mirai.Tests.csproj", "{DF106C29-7FFD-4712-8EAC-675F9B6C7E93}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D54A4953-D759-4DB8-88EF-C39DC6A5BEE3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D54A4953-D759-4DB8-88EF-C39DC6A5BEE3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D54A4953-D759-4DB8-88EF-C39DC6A5BEE3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D54A4953-D759-4DB8-88EF-C39DC6A5BEE3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DF106C29-7FFD-4712-8EAC-675F9B6C7E93}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DF106C29-7FFD-4712-8EAC-675F9B6C7E93}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DF106C29-7FFD-4712-8EAC-675F9B6C7E93}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DF106C29-7FFD-4712-8EAC-675F9B6C7E93}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6312E2B6-2953-494C-AD1A-0A5632E81EF9}
+	EndGlobalSection
+EndGlobal

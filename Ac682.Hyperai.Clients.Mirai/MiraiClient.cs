@@ -23,15 +23,13 @@ namespace Ac682.Hyperai.Clients.Mirai
         private readonly MiraiClientOptions _options;
         private readonly ILogger<MiraiClient> _logger;
         private readonly IMessageChainFormatter _formatter;
-        private readonly IDistributedCache _cache;
 
-        public MiraiClient(MiraiClientOptions options, ILogger<MiraiClient> logger, IMessageChainFormatter formatter, IDistributedCache cache)
+        public MiraiClient(MiraiClientOptions options, ILogger<MiraiClient> logger, IMessageChainFormatter formatter)
         {
             _options = options;
             _logger = logger;
             _formatter = formatter;
             _session = new MiraiHttpSession(options.Host, options.Port, options.AuthKey, options.SelfQQ);
-            _cache = cache;
         }
 
         public void Connect()
