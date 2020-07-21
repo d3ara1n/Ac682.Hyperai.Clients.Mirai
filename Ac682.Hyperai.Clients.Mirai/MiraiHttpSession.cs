@@ -13,6 +13,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace Ac682.Hyperai.Clients.Mirai
 {
@@ -62,7 +63,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                 DisplayName = member.Value<string>("memberName"),
                 Role = OfRole(member.Value<string>("permission"))
             };
-            res.Group = OfGroup(group);
+            res.Group = new Lazy<Group>(() => OfGroup(group));
             return res;
         }
         Group OfGroup(JToken group)
@@ -72,8 +73,8 @@ namespace Ac682.Hyperai.Clients.Mirai
                 Identity = group.Value<long>("id"),
                 Name = group.Value<string>("name"),
             };
-            res.Members = GetMembersAsync(res).GetAwaiter().GetResult();
-            res.Owner = res.Members.FirstOrDefault(x => x.Role == GroupRole.Owner);
+            res.Members = new Lazy<IEnumerable<Member>>(() => GetMembersAsync(res).GetAwaiter().GetResult());
+            res.Owner = new Lazy<Member>(() => res.Members.Value.FirstOrDefault(x => x.Role == GroupRole.Owner));
             return res;
         }
 
@@ -103,7 +104,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                             Message = _parser.Parse(evt.Value<JArray>("messageChain").ToString()),
                             User = OfMember(evt["sender"], evt["sender"]["group"]),
                         };
-                        args.Group = args.User.Group;
+                        args.Group = args.User.Group.Value;
                         return args;
                     }
                 case "GroupRecallEvent":
@@ -114,7 +115,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                             MessageId = evt.Value<long>("messageId"),
                             Operator = OfMember(evt["operator"], evt["group"])
                         };
-                        args.Group = args.Operator.Group;
+                        args.Group = args.Operator.Group.Value;
                         return args;
                     }
                 case "FriendRecallEvent":
@@ -144,7 +145,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                             Duration = evt.Value<long>("duration"),
                             Operator = OfMember(evt["operator"], evt["operator"]["group"]),
                         };
-                        args.Group = args.Operator.Group;
+                        args.Group = args.Operator.Group.Value;
                         return args;
                     }
                 case "BotUnmuteEvent":
@@ -153,7 +154,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                         {
                             Operator = OfMember(evt["operator"], evt["opeartor"]["group"])
                         };
-                        args.Group = args.Operator.Group;
+                        args.Group = args.Operator.Group.Value;
                         return args;
                     }
                 case "BotLeaveEventActive":
@@ -163,7 +164,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                             IsKicked = false,
                             Operator = GetMemberInfoAsync(_selfQQ, evt["group"].Value<long>("id")).GetAwaiter().GetResult()
                         };
-                        args.Group = args.Operator.Group;
+                        args.Group = args.Operator.Group.Value;
                         return args;
                     }
                 case "BotLeaveEventKick":
@@ -173,7 +174,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                             IsKicked = true,
                             Operator = GetMemberInfoAsync(_selfQQ, evt["group"].Value<long>("id")).GetAwaiter().GetResult()
                         };
-                        args.Group = args.Operator.Group;
+                        args.Group = args.Operator.Group.Value;
                         return args;
                     }
                 case "GroupNameChangeEvent":
@@ -184,7 +185,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                             Present = evt.Value<string>("current"),
                             Operator = OfMember(evt["operator"], evt["group"])
                         };
-                        args.Group = args.Operator.Group;
+                        args.Group = args.Operator.Group.Value;
                         return args;
                     }
                 case "GroupMuteAllEvent":
@@ -194,7 +195,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                             IsEnded = !evt.Value<bool>("current"),
                             Operator = OfMember(evt["operator"], evt["group"]),
                         };
-                        args.Group = args.Operator.Group;
+                        args.Group = args.Operator.Group.Value;
                         return args;
                     }
                 case "MemberJoinEvent":
@@ -203,7 +204,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                         {
                             Who = OfMember(evt["member"], evt["member"]["group"])
                         };
-                        args.Group = args.Who.Group;
+                        args.Group = args.Who.Group.Value;
                         return args;
                     }
                 case "MemberLeaveEventKick":
@@ -214,7 +215,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                             Who = OfMember(evt["member"], evt["member"]["group"]),
                             Operator = OfMember(evt["operator"], evt["operator"]["group"])
                         };
-                        args.Group = args.Who.Group;
+                        args.Group = args.Who.Group.Value;
                         return args;
                     }
                 case "MemberLeaveEventQuit":
@@ -225,7 +226,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                             Who = OfMember(evt["member"], evt["member"]["group"]),
                         };
                         args.Operator = args.Who;
-                        args.Group = args.Who.Group;
+                        args.Group = args.Who.Group.Value;
                         return args;
                     }
                 case "MemberCardChangeEvent":
@@ -237,7 +238,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                             Present = evt.Value<string>("current"),
                             Operator = OfMember(evt["operator"], evt["operator"]["group"])
                         };
-                        args.Group = args.WhoseName.Group;
+                        args.Group = args.WhoseName.Group.Value;
                         return args;
                     }
                 case "MemberSpecialTitleChangeEvent":
@@ -248,7 +249,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                             Present = evt.Value<string>("current"),
                             Who = OfMember(evt["member"], evt["member"]["group"])
                         };
-                        args.Group = args.Who.Group;
+                        args.Group = args.Who.Group.Value;
                         return args;
                     }
                 case "MemberPermissionChangeEvent":
@@ -259,7 +260,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                             Present = OfRole(evt.Value<string>("current")),
                             Whom = OfMember(evt["member"], evt["member"]["group"])
                         };
-                        args.Group = args.Whom.Group;
+                        args.Group = args.Whom.Group.Value;
                         return args;
                     }
                 case "MemberMuteEvent":
@@ -270,7 +271,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                             Whom = OfMember(evt["member"], evt["member"]["group"]),
                             Operator = OfMember(evt["operator"], evt["operator"]["group"]),
                         };
-                        args.Group = args.Whom.Group;
+                        args.Group = args.Whom.Group.Value;
                         return args;
                     }
                 case "MemberUnmuteEvent":
@@ -280,7 +281,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                             Operator = OfMember(evt["operator"], evt["operator"]["group"]),
                             Whom = OfMember(evt["member"], evt["member"]["group"])
                         };
-                        args.Group = args.Whom.Group;
+                        args.Group = args.Whom.Group.Value;
                         return args;
                     }
                 case "NewFriendRequestEvent":
@@ -379,7 +380,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                     Nickname = info.Value<string>("name"),
                     Title = info.Value<string>("specialTitle"),
                     Role = GroupRole.Member, // 无法从 api 中得知
-                    Group = await GetGroupInfoAsync(groupId)
+                    Group = new Lazy<Group>(() => GetGroupInfoAsync(groupId).GetAwaiter().GetResult())
                 };
                 return member;
             }
@@ -398,8 +399,8 @@ namespace Ac682.Hyperai.Clients.Mirai
                 {
                     Name = info.Value<string>("name"),
                 };
-                group.Members = await GetMembersAsync(group);
-                group.Owner = group.Members.FirstOrDefault(x => x.Role == GroupRole.Owner);
+                group.Members = new Lazy<IEnumerable<Member>>(GetMembersAsync(group).GetAwaiter().GetResult());
+                group.Owner = new Lazy<Member>(() => group.Members.Value.FirstOrDefault(x => x.Role == GroupRole.Owner));
                 return group;
             }
             catch
@@ -421,9 +422,8 @@ namespace Ac682.Hyperai.Clients.Mirai
                         Identity = group.Value<long>("id"),
                         Name = group.Value<string>("name")
                     };
-                    var members = await GetMembersAsync(ins);
-                    ins.Members = members;
-                    ins.Members = Enumerable.Empty<Member>();
+                    ins.Members = new Lazy<IEnumerable<Member>>(() => GetMembersAsync(ins).GetAwaiter().GetResult());
+                    ins.Owner = new Lazy<Member>(() => ins.Members.Value.FirstOrDefault(x => x.Role == GroupRole.Owner));
                     list.Add(ins);
                 }
                 return list;
@@ -447,7 +447,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                         Identity = member.Value<long>("id"),
                         DisplayName = member.Value<string>("memberName"),
                         Role = member.Value<string>("permission") switch { "OWNER" => GroupRole.Owner, "ADMINISTRATOR" => GroupRole.Administrator, _ => GroupRole.Member },
-                        Group = group
+                        Group = new Lazy<Group>(group)
                     });
                 }
                 return list;
@@ -484,12 +484,12 @@ namespace Ac682.Hyperai.Clients.Mirai
 
         public async Task SendMemberRequestResponsedAsync(long eventId, long userId, long groupId, MemberRequestResponseOperationType action, string message)
         {
-            await _client.PostObjectAsync("resp/memberJoinRequestEvent", new {sessionKey = this.sessionKey, eventId = eventId, fromId = userId, groupId = groupId, operate = (int)action, message = message});
+            await _client.PostObjectAsync("resp/memberJoinRequestEvent", new { sessionKey = this.sessionKey, eventId = eventId, fromId = userId, groupId = groupId, operate = (int)action, message = message });
         }
 
         public async Task SendFriendRequestResponsedAsync(long eventId, long userId, long groupId, FriendRequestResponseOperationType action, string message)
         {
-            await _client.PostObjectAsync("resp/newFriendRequestEvent", new {sessionKey = this.sessionKey, eventId   = eventId, fromId   = userId, groupId = groupId, operate = (int)action, message= message});
+            await _client.PostObjectAsync("resp/newFriendRequestEvent", new { sessionKey = this.sessionKey, eventId = eventId, fromId = userId, groupId = groupId, operate = (int)action, message = message });
         }
 
         private async Task PreprocessChainAsync(MessageChain chain, MessageEventType type)

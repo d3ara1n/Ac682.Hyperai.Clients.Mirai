@@ -6,8 +6,6 @@ on:
 
 jobs:
   build_and_punlish:
-    env: 
-      PROJECT_NAME: Ac682.Hyperai.Clients.Mirai
     runs-on: ubuntu-latest
 
     steps:
@@ -18,12 +16,10 @@ jobs:
         dotnet-version: 3.1.101
     - name: Install dependencies
       run: |
-        dotnet restore $PROJECT_NAME
+        dotnet restore Ac682.Hyperai.Clients.Mirai
     - name: Build
       run: |
-        dotnet build --configuration Release --no-restore $PROJECT_NAME
-    - name: Pack
-      run: dotnet pack --configuration Release --include-symbols -o bin/artifacts/ $PROJECT_NAME
+        dotnet build --configuration Release --no-restore Ac682.Hyperai.Clients.Mirai
     - name: publish on version change
       id: publish_nuget
       uses: rohith/publish-nuget@v2
