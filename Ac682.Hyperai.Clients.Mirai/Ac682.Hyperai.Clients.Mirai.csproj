@@ -2,9 +2,9 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
-    <AssemblyVersion>2020.7.22</AssemblyVersion>
+    <AssemblyVersion>2020.7.23</AssemblyVersion>
     <PackageId>Ac682.Hyperai.Clients.Mirai</PackageId>
-    <Version>2020.7.22</Version>
+    <Version>2020.7.23</Version>
     <Authors>ac682</Authors>
     <Company>Unicore</Company>
     <PackageDescription>Ac682.Hyperai.Clients.Mirai</PackageDescription>
@@ -15,7 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Hyperai.Abstractions" Version="2020.7.20" />
+    <PackageReference Include="Hyperai.Abstractions" Version="2020.7.21" />
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="5.0.0-preview.6.20305.6" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="5.0.0-preview.6.20305.6" />

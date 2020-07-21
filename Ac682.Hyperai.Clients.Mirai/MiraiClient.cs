@@ -85,8 +85,10 @@ namespace Ac682.Hyperai.Clients.Mirai
                 {
                     _logger.LogInformation("Event received: " + evt);
                     InvokeHandler(evt);
+                }else
+                {
+                	Thread.Sleep(10);
                 }
-                Thread.Sleep(100);
             }
             Disconnect();
         }
@@ -110,11 +112,11 @@ namespace Ac682.Hyperai.Clients.Mirai
             }
             else if (typeof(T) == typeof(Self))
             {
-                return ChangeType<T>(new Self() { Groups = await _session.GetGroupsAsync(), Friends = await _session.GetFriendsAsync() }) ?? id;
+                return ChangeType<T>(new Self() { Groups = new Lazy<IEnumerable<Group>>(() => _session.GetGroupsAsync().GetAwaiter().GetResult()), Friends = new Lazy<IEnumerable<Friend>>(() => _session.GetFriendsAsync().GetAwaiter().GetResult())}) ?? id;
             }
             else if (typeof(T) == typeof(Member))
             {
-                return ChangeType<T>(await _session.GetMemberInfoAsync(ChangeType<Member>(id).Identity, ChangeType<Member>(id).Group.Identity)) ?? id;
+                return ChangeType<T>(await _session.GetMemberInfoAsync(ChangeType<Member>(id).Identity, ChangeType<Member>(id).Group.Value.Identity)) ?? id;
             }
             return id;
         }
