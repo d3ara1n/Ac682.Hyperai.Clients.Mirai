@@ -7,7 +7,6 @@ using Hyperai.Services;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -57,6 +56,7 @@ namespace Ac682.Hyperai.Clients.Mirai
         }
         Member OfMember(JToken member, JToken group)
         {
+            if (member == null) return null;
             var res = new Member()
             {
                 Identity = member.Value<long>("id"),
@@ -236,8 +236,9 @@ namespace Ac682.Hyperai.Clients.Mirai
                             IsSelfOperated = false,
                             Original = evt.Value<string>("origin"),
                             Present = evt.Value<string>("current"),
-                            Operator = OfMember(evt["operator"], evt["operator"]["group"])
                         };
+                        // evt["operator"] 永远是 null， 至少我这边如此
+                        // args.Operator = evt["operator"] == null ? null : OfMember(evt["operator"], evt["operator"]["group"]);
                         args.Group = args.WhoseName.Group.Value;
                         return args;
                     }
@@ -322,7 +323,8 @@ namespace Ac682.Hyperai.Clients.Mirai
                         return args;
                     }
                 default:
-                    throw new NotImplementedException(evt.Value<string>("type"));
+                    // throw new NotImplementedException(evt.Value<string>("type"));
+                	return null;
             }
             #endregion
         }
@@ -508,32 +510,8 @@ namespace Ac682.Hyperai.Clients.Mirai
             MultipartFormDataContent content = new MultipartFormDataContent();
             content.Add(new StringContent(sessionKey), "sessionKey");
             content.Add(new StringContent(type switch { MessageEventType.Friend => "friend", MessageEventType.Group => "group", _ => throw new NotImplementedException() }), "type");
-            Stream imageStream = image.OpenRead();
-            string format;
-            using (System.Drawing.Image img = System.Drawing.Image.FromStream(imageStream))
-            {
-                format = img.RawFormat.ToString();
-                switch (format)
-                {
-                    case nameof(ImageFormat.Jpeg):
-                    case nameof(ImageFormat.Png):
-                    case nameof(ImageFormat.Gif):
-                        {
-                            format = format.ToLower();
-                            break;
-                        }
-                    default:
-                        {
-                            MemoryStream ms = new MemoryStream();
-                            img.Save(ms, ImageFormat.Png);
-                            imageStream.Dispose();
-                            imageStream = ms;
-                            format = "png";
-                            break;
-                        }
-                }
-            }
-            imageStream.Seek(0, SeekOrigin.Begin);
+            using Stream imageStream = image.OpenRead();
+            string format = "mirai";
             HttpContent imageContent = new StreamContent(imageStream);
             imageContent.Headers.ContentDisposition = new ContentDispositionHeaderValue("form-data")
             {
