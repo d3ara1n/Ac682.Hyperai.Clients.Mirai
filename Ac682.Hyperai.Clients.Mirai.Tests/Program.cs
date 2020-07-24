@@ -17,8 +17,6 @@ namespace Ac682.Hyperai.Clients.Mirai.Tests
             MiraiHttpSession session = new MiraiHttpSession("192.168.1.110", 6259, "NOAUTHKEY", 2594241159);
             session.Connect();
             var watch = new Stopwatch();
-            
-            session.SendGroupMessageAsync(new Group() { Identity = 594429092 }, new MessageChain(new MessageComponent[] { new Image("", new Uri(@"https://u.iheit.com/images/2020/07/24/DOAX-VenusVacation_200119_132834.jpg")), new Plain("DOA") })).Wait();
             while (true)
             {
                 watch.Restart();
@@ -28,6 +26,6 @@ namespace Ac682.Hyperai.Clients.Mirai.Tests
                 Thread.Sleep(100);
             }
 
-        }
+}
     }
 }

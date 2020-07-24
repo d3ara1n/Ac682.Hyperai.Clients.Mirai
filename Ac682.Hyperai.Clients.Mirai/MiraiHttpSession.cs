@@ -379,7 +379,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                 var member = new Member()
                 {
                     Identity = memberId,
-                    Nickname = info.Value<string>("name"),
+                    DisplayName = info.Value<string>("name"),
                     Title = info.Value<string>("specialTitle"),
                     Role = GroupRole.Member, // 无法从 api 中得知
                     Group = new Lazy<Group>(() => GetGroupInfoAsync(groupId).GetAwaiter().GetResult())
