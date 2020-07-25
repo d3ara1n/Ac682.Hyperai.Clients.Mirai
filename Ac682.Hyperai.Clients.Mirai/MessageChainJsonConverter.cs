@@ -10,6 +10,7 @@ namespace Ac682.Hyperai.Clients.Mirai
     {
         private static readonly JsonParser parser = new JsonParser();
         private static readonly JsonFormatter formatter = new JsonFormatter();
+
         public override MessageChain ReadJson(JsonReader reader, Type objectType, [AllowNull] MessageChain existingValue, bool hasExistingValue, JsonSerializer serializer)
         {
             string text = reader.ReadAsString();

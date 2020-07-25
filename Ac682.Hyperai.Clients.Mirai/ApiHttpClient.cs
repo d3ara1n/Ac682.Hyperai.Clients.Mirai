@@ -13,6 +13,7 @@ namespace Ac682.Hyperai.Clients.Mirai
         public string UserAgent => $"AHCMirai/{Assembly.GetExecutingAssembly().GetName().Version} Hyperai/{Assembly.GetAssembly(typeof(MessageChain)).GetName().Version} CLR/{Assembly.GetAssembly(typeof(object)).GetName().Version}";
 
         private readonly HttpClient client;
+
         public ApiHttpClient(string baseUrl)
         {
             BaseUrl = baseUrl;
