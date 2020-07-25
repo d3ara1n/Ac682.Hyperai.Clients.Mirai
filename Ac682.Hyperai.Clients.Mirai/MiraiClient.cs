@@ -2,7 +2,6 @@
 using Hyperai.Messages;
 using Hyperai.Relations;
 using Hyperai.Services;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -67,6 +66,7 @@ namespace Ac682.Hyperai.Clients.Mirai
         }
 
         private readonly bool isDisposed = false;
+
         protected virtual void Dispose(bool isDisposing)
         {
             if (!isDisposed && isDisposing)
@@ -80,14 +80,23 @@ namespace Ac682.Hyperai.Clients.Mirai
         {
             while (State == ApiClientConnectionState.Connected)
             {
-                GenericEventArgs evt = _session.PullEvent();
+                GenericEventArgs evt = null;
+                try
+                {
+                    evt = _session.PullEvent();
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "Exception occurred while pulling event.");
+                }
                 if (evt != null)
                 {
                     _logger.LogInformation("Event received: " + evt);
                     InvokeHandler(evt);
-                }else
+                }
+                else
                 {
-                	Thread.Sleep(10);
+                    Thread.Sleep(10);
                 }
             }
             Disconnect();
@@ -112,7 +121,7 @@ namespace Ac682.Hyperai.Clients.Mirai
             }
             else if (typeof(T) == typeof(Self))
             {
-                return ChangeType<T>(new Self() { Groups = new Lazy<IEnumerable<Group>>(() => _session.GetGroupsAsync().GetAwaiter().GetResult()), Friends = new Lazy<IEnumerable<Friend>>(() => _session.GetFriendsAsync().GetAwaiter().GetResult())}) ?? id;
+                return ChangeType<T>(new Self() { Groups = new Lazy<IEnumerable<Group>>(() => _session.GetGroupsAsync().GetAwaiter().GetResult()), Friends = new Lazy<IEnumerable<Friend>>(() => _session.GetFriendsAsync().GetAwaiter().GetResult()) }) ?? id;
             }
             else if (typeof(T) == typeof(Member))
             {
@@ -138,19 +147,23 @@ namespace Ac682.Hyperai.Clients.Mirai
                 case FriendMessageEventArgs friendMessage:
                     await _session.SendFriendMessageAsync(friendMessage.User, friendMessage.Message);
                     break;
+
                 case GroupMessageEventArgs groupMessage:
                     await _session.SendGroupMessageAsync(groupMessage.Group, groupMessage.Message);
                     break;
+
                 case MemberRequestResponsedEventArgs mRespose:
                     await _session.SendMemberRequestResponsedAsync(mRespose.EventId, mRespose.FromWhom, mRespose.InWhichGroup, mRespose.Operation, mRespose.MessageToAttach);
                     break;
+
                 case FriendRequestResponsedEventArgs fRespose:
                     await _session.SendFriendRequestResponsedAsync(fRespose.EventId, fRespose.FromWhom, fRespose.FromWhichGroup, fRespose.Operation, fRespose.MessageToAttach);
                     break;
+
                 default:
                     throw new NotImplementedException();
             }
-            _logger.LogInformation("EventArgs sendt: {0}", args);
+            _logger.LogInformation("EventArgs sent: {0}", args);
         }
 
         public string RequestRawAsync(string resource)

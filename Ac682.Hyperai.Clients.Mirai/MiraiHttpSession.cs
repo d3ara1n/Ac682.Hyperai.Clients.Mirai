@@ -12,7 +12,6 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Caching.Distributed;
 
 namespace Ac682.Hyperai.Clients.Mirai
 {
@@ -21,7 +20,6 @@ namespace Ac682.Hyperai.Clients.Mirai
         public ApiClientConnectionState State { get; private set; } = ApiClientConnectionState.Disconnected;
         private readonly string _authKey;
         private readonly long _selfQQ;
-
 
         private readonly ApiHttpClient _client;
         private readonly JsonParser _parser = new JsonParser();
@@ -45,7 +43,7 @@ namespace Ac682.Hyperai.Clients.Mirai
             return null;
         }
 
-        GroupRole OfRole(string name)
+        private GroupRole OfRole(string name)
         {
             return name switch
             {
@@ -54,7 +52,8 @@ namespace Ac682.Hyperai.Clients.Mirai
                 _ => GroupRole.Member
             };
         }
-        Member OfMember(JToken member, JToken group)
+
+        private Member OfMember(JToken member, JToken group)
         {
             if (member == null) return null;
             var res = new Member()
@@ -66,7 +65,8 @@ namespace Ac682.Hyperai.Clients.Mirai
             res.Group = new Lazy<Group>(() => OfGroup(group));
             return res;
         }
-        Group OfGroup(JToken group)
+
+        private Group OfGroup(JToken group)
         {
             var res = new Group()
             {
@@ -81,6 +81,7 @@ namespace Ac682.Hyperai.Clients.Mirai
         public GenericEventArgs ReadEventJObject(JToken evt)
         {
             #region 事件工厂
+
             switch (evt.Value<string>("type"))
             {
                 case "FriendMessage":
@@ -237,8 +238,8 @@ namespace Ac682.Hyperai.Clients.Mirai
                             Original = evt.Value<string>("origin"),
                             Present = evt.Value<string>("current"),
                         };
-                        // evt["operator"] 永远是 null， 至少我这边如此
-                        // args.Operator = evt["operator"] == null ? null : OfMember(evt["operator"], evt["operator"]["group"]);
+                        // evt["operator"] 永远是 null， 至少我这边如此 args.Operator = evt["operator"] == null
+                        // ? null : OfMember(evt["operator"], evt["operator"]["group"]);
                         args.Group = args.WhoseName.Group.Value;
                         return args;
                     }
@@ -324,14 +325,14 @@ namespace Ac682.Hyperai.Clients.Mirai
                     }
                 default:
                     // throw new NotImplementedException(evt.Value<string>("type"));
-                	return null;
+                    return null;
             }
-            #endregion
+
+            #endregion 事件工厂
         }
 
         public void Connect()
         {
-
             JToken auth = _client.PostObjectAsync("auth", new { authKey = _authKey }).GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
             sessionKey = auth.Value<string>("session");
             if (auth.Value<int>("code") == -1)
@@ -463,7 +464,7 @@ namespace Ac682.Hyperai.Clients.Mirai
         public async Task<long> SendFriendMessageAsync(Friend friend, MessageChain chain)
         {
             await PreprocessChainAsync(chain, MessageEventType.Friend);
-            HttpResponseMessage response = await _client.PostObjectAsync("sendFriendMessage", new { sessionKey = sessionKey, target = friend.Identity, messageChain = chain.AsReadable() });
+            HttpResponseMessage response = await _client.PostObjectAsync("sendFriendMessage", new { sessionKey = sessionKey, target = friend.Identity, messageChain = new MessageChain(chain.Where(x => !(x is Quote) && !(x is Source))), quote = ((Quote)chain.FirstOrDefault(x => x is Quote))?.MessageId });
             JToken message = await response.GetJsonObjectAsync();
             if (message.Value<int>("code") != 0)
             {
@@ -475,7 +476,7 @@ namespace Ac682.Hyperai.Clients.Mirai
         public async Task<long> SendGroupMessageAsync(Group group, MessageChain chain)
         {
             await PreprocessChainAsync(chain, MessageEventType.Group);
-            HttpResponseMessage response = await _client.PostObjectAsync("sendGroupMessage", new { sessionKey = sessionKey, target = group.Identity, messageChain = chain.AsReadable() });
+            HttpResponseMessage response = await _client.PostObjectAsync("sendGroupMessage", new { sessionKey = sessionKey, target = group.Identity, messageChain = new MessageChain(chain.Where(x => !(x is Quote) && !(x is Source))), quote = ((Quote)chain.FirstOrDefault(x => x is Quote))?.MessageId });
             JToken message = await response.GetJsonObjectAsync();
             if (message.Value<int>("code") != 0)
             {
@@ -541,6 +542,7 @@ namespace Ac682.Hyperai.Clients.Mirai
         }
 
         private readonly bool isDisposed = false;
+
         protected virtual void Dispose(bool isDisposing)
         {
             if (isDisposing && !isDisposed)
