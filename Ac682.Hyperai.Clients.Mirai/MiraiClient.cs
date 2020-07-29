@@ -16,6 +16,7 @@ namespace Ac682.Hyperai.Clients.Mirai
         public ApiClientConnectionState State => _session.State;
 
         private readonly List<(Type, object)> handlers = new List<(Type, object)>();
+        private int waitTime = 3000;
 
         private readonly MiraiHttpSession _session;
 
@@ -87,12 +88,15 @@ namespace Ac682.Hyperai.Clients.Mirai
                 }
                 catch (Exception e)
                 {
-                    _logger.LogError(e, "Exception occurred while pulling event.");
+                    _logger.LogError(e, "Exception occurred while pulling event. Next try in {}ms", waitTime);
+                    Thread.Sleep(waitTime);
+                    waitTime *= 2;
                 }
                 if (evt != null)
                 {
                     _logger.LogInformation("Event received: " + evt);
                     InvokeHandler(evt);
+                    waitTime = 3000;
                 }
                 else
                 {
