@@ -401,6 +401,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                 JToken info = await (await _client.GetAsync($"groupConfig?sessionKey={sessionKey}&target={groupId}")).GetJsonObjectAsync();
                 var group = new Group()
                 {
+                    Identity = groupId,
                     Name = info.Value<string>("name"),
                 };
                 group.Members = new Lazy<IEnumerable<Member>>(GetMembersAsync(group).GetAwaiter().GetResult());
