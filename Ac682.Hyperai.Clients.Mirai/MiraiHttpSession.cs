@@ -237,6 +237,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                             IsSelfOperated = false,
                             Original = evt.Value<string>("origin"),
                             Present = evt.Value<string>("current"),
+                            WhoseName = OfMember(evt["member"], evt["member"]["group"])
                         };
                         // evt["operator"] 永远是 null， 至少我这边如此 args.Operator = evt["operator"] == null
                         // ? null : OfMember(evt["operator"], evt["operator"]["group"]);
@@ -400,6 +401,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                 JToken info = await (await _client.GetAsync($"groupConfig?sessionKey={sessionKey}&target={groupId}")).GetJsonObjectAsync();
                 var group = new Group()
                 {
+                    Identity = groupId,
                     Name = info.Value<string>("name"),
                 };
                 group.Members = new Lazy<IEnumerable<Member>>(GetMembersAsync(group).GetAwaiter().GetResult());
