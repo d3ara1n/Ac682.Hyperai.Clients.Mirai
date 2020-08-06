@@ -125,7 +125,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                         {
                             MessageId = evt.Value<long>("messageId"),
                             Operator = evt.Value<long>("operator"),
-                            WhoseMessage = evt.Value<long>("authorId")
+                            // WhoseMessage = evt.Value<long>("authorId")
                         };
                         return args;
                     }
@@ -143,7 +143,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                     {
                         var args = new GroupSelfMutedEventArgs()
                         {
-                            Duration = evt.Value<long>("duration"),
+                            Duration = TimeSpan.FromSeconds(evt.Value<long>("duration")),
                             Operator = OfMember(evt["operator"], evt["operator"]["group"]),
                         };
                         args.Group = args.Operator.Group.Value;
@@ -270,7 +270,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                     {
                         var args = new GroupMemberMutedEventArgs()
                         {
-                            Duration = evt.Value<long>("duration"),
+                            Duration = TimeSpan.FromSeconds(evt.Value<long>("duration")),
                             Whom = OfMember(evt["member"], evt["member"]["group"]),
                             Operator = OfMember(evt["operator"], evt["operator"]["group"]),
                         };
@@ -478,7 +478,7 @@ namespace Ac682.Hyperai.Clients.Mirai
         public async Task<long> SendGroupMessageAsync(Group group, MessageChain chain)
         {
             await PreprocessChainAsync(chain, MessageEventType.Group);
-            HttpResponseMessage response = await _client.PostObjectAsync("sendGroupMessage", new { sessionKey = sessionKey, target = group.Identity, messageChain = new MessageChain(chain.Where(x => !(x is Quote) && !(x is Source))), quote = ((Quote)chain.FirstOrDefault(x => x is Quote))?.MessageId });
+            HttpResponseMessage response = await _client.PostObjectAsync("sendGroupMessage", new { sessionKey, target = group.Identity, messageChain = new MessageChain(chain.Where(x => !(x is Quote) && !(x is Source))), quote = ((Quote)chain.FirstOrDefault(x => x is Quote))?.MessageId });
             JToken message = await response.GetJsonObjectAsync();
             if (message.Value<int>("code") != 0)
             {
@@ -487,14 +487,29 @@ namespace Ac682.Hyperai.Clients.Mirai
             return message.Value<long>("messageId");
         }
 
+        public async Task RevokeMessageAsync(long messageId)
+        {
+            await _client.PostObjectAsync("recall", new { sessionKey, target = messageId });
+        }
+
+        public async Task KickMemberAsync(Member member)
+        {
+            await _client.PostObjectAsync("kick", new { sessionKey, target = member.Group.Value.Identity, member = member.Identity, message = "You are KICKED!" });
+        }
+
+        public async Task QuitGroupAsync(Group group)
+        {
+            await _client.PostObjectAsync("quit", new { sessionKey, target = group.Identity });
+        }
+
         public async Task SendMemberRequestResponsedAsync(long eventId, long userId, long groupId, MemberRequestResponseOperationType action, string message)
         {
-            await _client.PostObjectAsync("resp/memberJoinRequestEvent", new { sessionKey = this.sessionKey, eventId = eventId, fromId = userId, groupId = groupId, operate = (int)action, message = message });
+            await _client.PostObjectAsync("resp/memberJoinRequestEvent", new { sessionKey, eventId, fromId = userId, groupId, operate = (int)action, message });
         }
 
         public async Task SendFriendRequestResponsedAsync(long eventId, long userId, long groupId, FriendRequestResponseOperationType action, string message)
         {
-            await _client.PostObjectAsync("resp/newFriendRequestEvent", new { sessionKey = this.sessionKey, eventId = eventId, fromId = userId, groupId = groupId, operate = (int)action, message = message });
+            await _client.PostObjectAsync("resp/newFriendRequestEvent", new { sessionKey, eventId, fromId = userId, groupId, operate = (int)action, message });
         }
 
         private async Task PreprocessChainAsync(MessageChain chain, MessageEventType type)

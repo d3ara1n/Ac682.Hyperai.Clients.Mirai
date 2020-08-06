@@ -144,7 +144,7 @@ namespace Ac682.Hyperai.Clients.Mirai
             return (T)Convert.ChangeType(o, typeof(T));
         }
 
-        public async Task SendAsync<TEventArgs>(TEventArgs args) where TEventArgs : MessageEventArgs
+        public async Task SendAsync<TEventArgs>(TEventArgs args) where TEventArgs : GenericEventArgs
         {
             switch (args)
             {
@@ -162,6 +162,18 @@ namespace Ac682.Hyperai.Clients.Mirai
 
                 case FriendRequestResponsedEventArgs fRespose:
                     await _session.SendFriendRequestResponsedAsync(fRespose.EventId, fRespose.FromWhom, fRespose.FromWhichGroup, fRespose.Operation, fRespose.MessageToAttach);
+                    break;
+
+                case RecallEventArgs recall:
+                    await _session.RevokeMessageAsync(recall.MessageId);
+                    break;
+
+                case GroupMemberLeftEventArgs gLeft:
+                    await _session.KickMemberAsync(gLeft.Who);
+                    break;
+
+                case GroupSelfLeftEventArgs qiezi:
+                    await _session.QuitGroupAsync(qiezi.Group);
                     break;
 
                 default:
