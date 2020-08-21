@@ -341,7 +341,7 @@ namespace Ac682.Hyperai.Clients.Mirai
                 throw new ArgumentException("Wrong MIRAI API HTTP auth key");
             }
 
-            JToken verify = _client.PostObjectAsync("verify", new { sessionKey = sessionKey, qq = _selfQQ }).GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
+            JToken verify = _client.PostObjectAsync("verify", new { sessionKey, qq = _selfQQ }).GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
             if (verify.Value<int>("code") != 0)
             {
                 throw new ArgumentException(verify.Value<string>("msg"));
@@ -439,7 +439,20 @@ namespace Ac682.Hyperai.Clients.Mirai
             }
         }
 
-        private async Task<IEnumerable<Member>> GetMembersAsync(Group group)
+        public async Task<MessageChain> GetMessageById(long id)
+        {
+            try
+            {
+                JToken message = await (await _client.GetAsync($"/messageFromId?sessionKey={sessionKey}&id={id}")).GetJsonObjectAsync();
+                MessageChain chain = _parser.Parse(message["data"].Value<JArray>("messageChain").ToString());
+                return chain;
+            }catch
+            {
+                return null;
+            }
+        }
+
+        public async Task<IEnumerable<Member>> GetMembersAsync(Group group)
         {
             try
             {
@@ -466,7 +479,7 @@ namespace Ac682.Hyperai.Clients.Mirai
         public async Task<long> SendFriendMessageAsync(Friend friend, MessageChain chain)
         {
             await PreprocessChainAsync(chain, MessageEventType.Friend);
-            HttpResponseMessage response = await _client.PostObjectAsync("sendFriendMessage", new { sessionKey = sessionKey, target = friend.Identity, messageChain = new MessageChain(chain.Where(x => !(x is Quote) && !(x is Source))), quote = ((Quote)chain.FirstOrDefault(x => x is Quote))?.MessageId });
+            HttpResponseMessage response = await _client.PostObjectAsync("sendFriendMessage", new { sessionKey, target = friend.Identity, messageChain = new MessageChain(chain.Where(x => !(x is Quote) && !(x is Source))), quote = ((Quote)chain.FirstOrDefault(x => x is Quote))?.MessageId });
             JToken message = await response.GetJsonObjectAsync();
             if (message.Value<int>("code") != 0)
             {
@@ -525,9 +538,11 @@ namespace Ac682.Hyperai.Clients.Mirai
 
         private async Task UploadImageAsync(Image image, MessageEventType type)
         {
-            MultipartFormDataContent content = new MultipartFormDataContent();
-            content.Add(new StringContent(sessionKey), "sessionKey");
-            content.Add(new StringContent(type switch { MessageEventType.Friend => "friend", MessageEventType.Group => "group", _ => throw new NotImplementedException() }), "type");
+            MultipartFormDataContent content = new MultipartFormDataContent
+            {
+                { new StringContent(sessionKey), "sessionKey" },
+                { new StringContent(type switch { MessageEventType.Friend => "friend", MessageEventType.Group => "group", _ => throw new NotImplementedException() }), "type" }
+            };
             using Stream imageStream = image.OpenRead();
             string format = "mirai";
             HttpContent imageContent = new StreamContent(imageStream);
@@ -547,7 +562,7 @@ namespace Ac682.Hyperai.Clients.Mirai
         {
             if (State == ApiClientConnectionState.Connected)
             {
-                JToken release = _client.PostObjectAsync("release", new { sessionKey = sessionKey, qq = _selfQQ }).GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
+                _ = _client.PostObjectAsync("release", new { sessionKey, qq = _selfQQ }).GetAwaiter().GetResult().GetJsonObjectAsync().GetAwaiter().GetResult();
                 State = ApiClientConnectionState.Disconnected;
             }
         }

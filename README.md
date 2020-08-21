@@ -31,12 +31,12 @@ client.Listen();
 
 void Reply(FriendMessageEventArgs args)
 {
-    var event = new FriendMessageEventArgs()
+    var @event = new FriendMessageEventArgs()
     {
         User = args.User,
         Message = MessageChain.Construct(new Plain("[自动回复]有事不在, 稍后回复."))
     };
-    client.SendAsync(event).Wait();
+    client.SendAsync(@event).Wait();
 }
 ```
 
@@ -47,13 +47,10 @@ void Reply(FriendMessageEventArgs args)
 HyperaiShell 配置文件 `appsettings.json` 中关于客户端的内容修改如下
 ```json
 {    
-    // ...
     "Application": 
     {
-        // ...
         "SelectedClientName": "Mirai"
-        // ...
-    }
+    },
     "Clients": [
         {
             "Name": "Mirai",
@@ -67,6 +64,5 @@ HyperaiShell 配置文件 `appsettings.json` 中关于客户端的内容修改�
             }
         }
     ]
-    // ...
 }
 ```

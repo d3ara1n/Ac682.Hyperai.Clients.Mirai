@@ -33,9 +33,11 @@ namespace Ac682.Hyperai.Clients.Mirai
 
         public async Task<HttpResponseMessage> PostObjectAsync(string action, object body)
         {
-            JsonSerializerSettings settings = new JsonSerializerSettings();
-            settings.Formatting = Formatting.Indented;
-            settings.NullValueHandling = NullValueHandling.Ignore;
+            JsonSerializerSettings settings = new JsonSerializerSettings
+            {
+                Formatting = Formatting.Indented,
+                NullValueHandling = NullValueHandling.Ignore
+            };
             settings.Converters.Add(new MessageChainJsonConverter());
             string content = JsonConvert.SerializeObject(body, settings);
             return await PostAsync(action, new StringContent(content));
